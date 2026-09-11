@@ -1,0 +1,10 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+script = "script"
+
+# Same settings as the verified V2 deployment on Robinhood Chain
+solc_version = "0.8.36"
+optimizer = true
+optimizer_runs = 200

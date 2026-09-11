@@ -1,0 +1,13 @@
+# Foundry build output
+out/
+cache/
+broadcast/
+
+# Dependencies
+node_modules/
+
+# Env / secrets
+.env
+.env.*
+*.env
+*.pem
