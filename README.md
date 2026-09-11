@@ -132,8 +132,8 @@ These contracts are not permissionless end-to-end. It's worth being explicit abo
 Requires [Foundry](https://getfoundry.sh).
 
 ```bash
-git clone --recursive <repo-url>
-cd <repo>
+git clone --recursive https://github.com/MirakoolDev/pfwa-contracts.git
+cd pfwa-contracts
 forge build
 ```
 
