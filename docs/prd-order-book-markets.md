@@ -5,7 +5,7 @@
 
 ## Progress (Nov 2 2026)
 
-- **Built and tested** in [`orderbook/`](../orderbook): the factory, markets, outcome tokens, the hook, our own limit orders, the resolver with the dispute window, the fee collector and the NEAR Intents forwarder. 37 tests pass, plus a fork test of a market's whole life against the real PoolManager and USDG.
+- **Built and tested** in [`orderbook/`](../orderbook): the factory, markets, outcome tokens, the hook, our own limit orders, the resolver with the dispute window, the fee collector and the NEAR Intents forwarder. 38 tests pass, plus a fork test of a market's whole life against the real PoolManager and USDG.
 - **NEAR Intents** in [`orderbook/intents/`](../orderbook/intents): the 1Click client, order planning, the keeper and a CLI. Run end to end on a fork with live 1Click prices: 0.1 SOL → about 9.03 USDG → 14.66 YES in the buyer's wallet.
 - **Next:** the front end (spec §10), then mainnet once every fee, cap and bond is confirmed, a small real trade from another chain, and the demo video.
 - **Waiting on:** the launch fee rates, the per-market deposit cap, the arbitration multisig's signers, and a NEAR Intents partner key.

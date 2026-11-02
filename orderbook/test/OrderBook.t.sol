@@ -405,7 +405,7 @@ contract OrderBookTest is Test {
         vm.expectRevert(MarketResolver.WrongState.selector);
         resolver.finalize(marketId); // a disputed result waits for the owner
         vm.prank(alice);
-        vm.expectRevert(MarketResolver.NotOwner.selector);
+        vm.expectRevert(MarketResolver.NotArbiter.selector);
         resolver.settleDispute(marketId, 1);
         vm.prank(arbiter);
         resolver.settleDispute(marketId, 1); // it was NO
@@ -423,6 +423,34 @@ contract OrderBookTest is Test {
         resolver.settleDispute(marketId, 0); // YES stands
         assertEq(usdg.balanceOf(address(collector)) - collectorBefore, 50e6, "bond to the fee collector");
         assertEq(market.winningOutcome(), 0);
+    }
+
+    function test_theOwnerCanHandDisputesToAnotherArbiterAndNothingElse() public {
+        address vote = address(0xB07E); // stands in for a $PFWA holder vote
+        assertEq(resolver.arbiter(), arbiter, "starts as the owner");
+        vm.prank(alice);
+        vm.expectRevert(MarketResolver.NotOwner.selector);
+        resolver.setArbiter(vote);
+        vm.prank(arbiter);
+        resolver.setArbiter(vote);
+
+        vm.warp(block.timestamp + 1 days);
+        _resolve(creator, 0);
+        _dispute(bob);
+        vm.prank(arbiter);
+        vm.expectRevert(MarketResolver.NotArbiter.selector);
+        resolver.settleDispute(marketId, 1); // the owner no longer settles disputes
+        vm.prank(vote);
+        resolver.settleDispute(marketId, 1);
+        assertEq(market.winningOutcome(), 1);
+
+        vm.startPrank(vote); // and the arbiter gets none of the owner's other powers
+        vm.expectRevert(MarketResolver.NotOwner.selector);
+        resolver.setRelayer(vote);
+        vm.expectRevert(MarketResolver.NotOwner.selector);
+        resolver.setFeeCollector(vote);
+        vm.stopPrank();
+        assertFalse(resolver.mayResolve(marketId, vote), "nor the right to resolve markets");
     }
 
     function test_disputesOnlyOnAPendingResultAndOnlyOnce() public {

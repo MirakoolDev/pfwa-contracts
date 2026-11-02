@@ -1,6 +1,6 @@
 # Spec: Order book markets
 
-**Status (Nov 2 2026):** contracts built and tested in `orderbook/` (37 tests, plus a fork test of a market's whole life); the NEAR Intents flow built in `orderbook/intents/` and run end to end on a fork; not deployed; the front end not started (plan in §10) · **Product doc:** `docs/prd-order-book-markets.md`
+**Status (Nov 2 2026):** contracts built and tested in `orderbook/` (38 tests, plus a fork test of a market's whole life); the NEAR Intents flow built in `orderbook/intents/` and run end to end on a fork; not deployed; the front end not started (plan in §10) · **Product doc:** `docs/prd-order-book-markets.md`
 **Chain:** Robinhood Chain (4663) · **Collateral:** USDG (6 decimals)
 
 ## 1. Overview
@@ -122,12 +122,12 @@ Resolution works the way PFWA's bonding curve markets resolve today; the only ad
 
 ```
 Open ──resolveMarket(outcome)──▶ Pending (trading stops) ──2 hours, no dispute──▶ finalize() ──▶ Final
-Pending ──dispute() + bond──▶ Disputed ──settleDispute(outcome), by the owner──▶ Final
+Pending ──dispute() + bond──▶ Disputed ──settleDispute(outcome), by the arbiter──▶ Final
 ```
 
 **Who resolves:** the same rule as `PFWAMarketFactory.resolveMarket`: the market's creator, the relayer (the resolver bot reading the market's data source) for platform markets, the owner, and the relayer or owner once the market is 24 hours past its end of trading. A data source can settle a market before its deadline (instant results), and posting a result stops trading at once.
 
-**Disputes:** for 2 hours after a result is posted, anyone can dispute it by posting the market's bond (50 USDG by default, set per market at creation). The owner (the PFWA multisig) then confirms or corrects the result. A disputer who was right gets the bond back; one who was wrong loses it to `FeeCollector`. No dispute: anyone calls `finalize()` when the window ends.
+**Disputes:** for 2 hours after a result is posted, anyone can dispute it by posting the market's bond (50 USDG by default, set per market at creation). The arbiter then confirms or corrects the result. The arbiter only settles disputes: it starts as the owner (the PFWA multisig), and the owner can point it at another address with `setArbiter`, such as a $PFWA holder vote later, without handing over any other power. A disputer who was right gets the bond back; one who was wrong loses it to `FeeCollector`. No dispute: anyone calls `finalize()` when the window ends.
 
 **`INVALID` outcome:** every outcome token redeems for `1/N` USDG, rounded down so the total paid never exceeds the market's balance.
 

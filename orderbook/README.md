@@ -52,6 +52,7 @@ npm install && npm test   # Hardhat 3 (Solidity tests)
 - invalid markets
 - buybacks, including the keeper restriction
 - cross-chain execute and refund, and a big cross-chain order stopping at the price bound with the rest returned
+- the owner can hand dispute settlement to another arbiter (a $PFWA holder vote later) and nothing else
 - only the named deployer sets up the hook (it's deployed through the CREATE2 deployer)
 - limit orders: sells filled by a buy and buys filled by a sell crossing them, cancels (also after the market closes), orders at one price sharing the fill pro rata, the per-swap cap with anyone filling the rest, placement rules (far side, on the spacing, inside the bounds, trading open), only the hook reporting moves; fuzz: makers always get their share and the book stays solvent
 - the per-market deposit cap, and implementations that can't be initialised
@@ -63,7 +64,7 @@ npm install && npm test   # Hardhat 3 (Solidity tests)
 ROBINHOOD_RPC_URL=<rpc> forge test --match-contract OrderBookForkTest
 ```
 
-38 tests, all passing (37 local, 1 fork).
+39 tests, all passing (38 local, 1 fork).
 
 **Price bounds and routers:** a swap that would push an outcome past 0.001 or 0.999 USDG reverts. Front ends and the forwarder should set `sqrtPriceLimitX96` at the pool's bound so a big order stops there instead of failing.
 

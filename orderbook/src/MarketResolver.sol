@@ -10,14 +10,16 @@ import {OBMarket} from "./OBMarket.sol";
 /// step before winners can redeem.
 ///
 ///   Open ──resolveMarket(outcome)──▶ Pending (trading stops) ──2 hours, no dispute──▶ finalize() ──▶ Final
-///   Pending ──dispute() + bond──▶ Disputed ──settleDispute(outcome), by the owner──▶ Final
+///   Pending ──dispute() + bond──▶ Disputed ──settleDispute(outcome), by the arbiter──▶ Final
 ///
 /// - Who may resolve is PFWAMarketFactory.resolveMarket's rule: the market's creator; the relayer (the resolver
 ///   bot, which reads the market's data source) for platform markets; the owner; and the relayer or the owner once
 ///   the market is 24 hours past its end of trading.
-/// - Anyone may dispute a pending result within 2 hours by posting the market's bond in USDG. The owner (the PFWA
-///   multisig) then confirms or corrects it. A disputer who was right gets the bond back; one who was wrong loses it
-///   to the fee collector.
+/// - Anyone may dispute a pending result within 2 hours by posting the market's bond in USDG. The arbiter then
+///   confirms or corrects it. A disputer who was right gets the bond back; one who was wrong loses it to the fee
+///   collector.
+/// - The arbiter only settles disputes. It starts as the owner; the owner can point it at another address (a $PFWA
+///   holder vote, say) without handing over anything else.
 /// - An undisputed result becomes final when the window ends; anyone can call finalize().
 contract MarketResolver {
     using SafeERC20 for IERC20;
@@ -52,6 +54,8 @@ contract MarketResolver {
     address public factory;
     address public owner;
     address public pendingOwner;
+    /// @notice Settles disputes, and nothing else. Starts as the owner.
+    address public arbiter;
     /// @notice The resolver bot: resolves platform markets from their data source.
     address public relayer;
     address public feeCollector;
@@ -70,9 +74,11 @@ contract MarketResolver {
     event PlatformSet(address indexed creator, bool isPlatform);
     event OwnerProposed(address pendingOwner);
     event OwnerChanged(address owner);
+    event ArbiterSet(address arbiter);
 
     error NotFactory();
     error NotOwner();
+    error NotArbiter();
     error NotDeployer();
     error AlreadySet();
     error WrongState();
@@ -92,6 +98,7 @@ contract MarketResolver {
         usdg = usdg_;
         deployer = msg.sender;
         owner = owner_;
+        arbiter = owner_;
         relayer = relayer_;
         feeCollector = feeCollector_;
     }
@@ -155,9 +162,10 @@ contract MarketResolver {
         emit Finalized(marketId, r.outcome);
     }
 
-    /// @notice The owner settles a dispute with the final result. If it differs from the disputed one, the disputer
+    /// @notice The arbiter settles a dispute with the final result. If it differs from the disputed one, the disputer
     /// was right and gets the bond back; otherwise the bond goes to the fee collector.
-    function settleDispute(uint256 marketId, uint8 outcome) external onlyOwner {
+    function settleDispute(uint256 marketId, uint8 outcome) external {
+        if (msg.sender != arbiter) revert NotArbiter();
         Resolution storage r = resolutions[marketId];
         if (r.state != State.Disputed) revert WrongState();
         _checkOutcome(r, outcome);
@@ -201,6 +209,13 @@ contract MarketResolver {
     function setPlatform(address creator, bool platform) external onlyOwner {
         isPlatform[creator] = platform;
         emit PlatformSet(creator, platform);
+    }
+
+    /// @notice Points dispute settlement at `next`, for example a $PFWA holder vote. Changes nothing else.
+    function setArbiter(address next) external onlyOwner {
+        if (next == address(0)) revert ZeroAddress();
+        arbiter = next;
+        emit ArbiterSet(next);
     }
 
     function setOwner(address next) external onlyOwner {
