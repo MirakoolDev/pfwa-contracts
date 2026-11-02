@@ -1,6 +1,6 @@
 # Spec: Order book markets
 
-**Status:** draft for the Solidity dev · first implementation in `orderbook/` · **Product doc:** `docs/prd-order-book-markets.md`
+**Status (Nov 2 2026):** contracts built and tested in `orderbook/` (37 tests, plus a fork test of a market's whole life); the NEAR Intents flow built in `orderbook/intents/` and run end to end on a fork; not deployed; the front end not started (plan in §10) · **Product doc:** `docs/prd-order-book-markets.md`
 **Chain:** Robinhood Chain (4663) · **Collateral:** USDG (6 decimals)
 
 ## 1. Overview
@@ -37,7 +37,7 @@ The existing bonding curve factory (`0x7B38…4afa`) stays untouched. The front 
 | `PFWALimitOrders` | Limit orders, our own (see §6). |
 | `MarketResolver` | Resolution as on bonding curve markets, a 2-hour dispute window with a bond, and the final outcome. |
 | `FeeCollector` | Receives protocol fees in USDG, and runs the $PFWA buyback. |
-| `IntentForwarder` and `ForwarderFactory` | NEAR Intents entry: one-time deposit addresses that execute a trade (see §8). |
+| `ForwarderFactory` and `IntentDeposit` (in `IntentForwarder.sol`) | NEAR Intents entry: a one-time deposit address per order, which a keeper turns into outcome tokens (see §8). |
 
 Use Foundry. Clone pattern as in the existing factory.
 
@@ -46,11 +46,11 @@ Use Foundry. Clone pattern as in the existing factory.
 ```solidity
 struct MarketConfig {
     bytes32 setupHash;        // same setup fingerprint as bonding curve markets
-    uint64  endOfTrading;     // trading closes for good at this time, and proposals open
+    uint64  endOfTrading;     // trading closes for good at this time (or earlier, when a result is posted)
     uint8   outcomeCount;     // 2..10
     address creator;
-    uint16  creatorFeeBps;    // e.g. 100 = 1%
-    uint16  protocolFeeBps;   // e.g. 100 = 1%
+    uint16  creatorFeeBps;    // set by the creator, at most 200 (2%)
+    uint16  protocolFeeBps;   // the factory's current rate, at most 200 (2%); the launch rate is still to confirm
 }
 
 // OBMarket
@@ -137,16 +137,12 @@ Pending ──dispute() + bond──▶ Disputed ──settleDispute(outcome), b
 
 NEAR Intents' 1Click API lists Robinhood Chain as `hood`, with ETH, WETH and USDG.
 
-**Buy from another chain**
-1. **The front end asks the backend** for a forwarder address for `(user, marketId, outcome, minOut, deadline)`. `ForwarderFactory.predict()` computes it with CREATE2.
-2. **The backend gets a quote** from `POST /v0/quote`:
-   - origin asset: the user's choice
-   - destination asset: `nep141:hood-0x5fc5…d168.omft.near` (USDG on Robinhood Chain)
-   - recipient: the forwarder address
-3. **The user sends funds** to the 1Click deposit address on their own chain.
-4. **The backend tracks the swap.** It calls `POST /v0/deposit/submit`, then polls `GET /v0/status` until the status is `SUCCESS`.
-5. **A keeper executes.** It calls `ForwarderFactory.deployAndExecute(...)`, which deploys the forwarder, swaps its USDG into the outcome through the Universal Router (respecting `minOut`) and sends the outcome tokens to the user's Robinhood Chain address.
-6. **If execution fails** (price beyond `minOut`, or the deadline has passed), the user can call `refund()` on the forwarder to receive the USDG. The UI then offers a withdraw back to the original chain through 1Click.
+**Buy from another chain** (built: `src/IntentForwarder.sol`, and the off-chain side in `orderbook/intents/`)
+1. **Price it.** A dry `POST /v0/quote` prices the user's asset in USDG on Robinhood Chain (`nep141:hood-0x5fc5…d168.omft.near`).
+2. **Fix the order.** The V4 Quoter prices that USDG in the outcome, through the hook so the fee is included; minus slippage, that's `minOut`. The order is `(user, marketId, outcome, minOut, deadline, nonce)`, with a 3-hour deadline. `ForwarderFactory.depositAddress(order)` gives its deposit address on Robinhood Chain (a CREATE2 clone of `IntentDeposit`, salted by the order).
+3. **Open the swap.** A live quote with that deposit address as the recipient, and refunds to the user's own address on the origin chain. The user sends their asset to the 1Click deposit address on their chain. `POST /v0/deposit/submit` with the transaction hash speeds it up.
+4. **A keeper executes.** It watches `GET /v0/status` and the deposit address's USDG balance. Once USDG lands it calls `ForwarderFactory.execute(order)`, which deploys the clone if needed, swaps all its USDG into the outcome through the PoolManager, and sends the tokens to the user. A swap stops at the pool's price bound (0.999) instead of failing, and any USDG it couldn't spend goes back to the user. Fewer than `minOut` tokens reverts.
+5. **Refunds.** The user can call `refund(order)` at any time, and anyone can once the deadline has passed; the USDG goes to the user on Robinhood Chain, and the UI then offers a withdraw back through 1Click. The keeper refunds expired orders itself.
 
 **Withdraw to another chain**
 1. The user redeems or sells for USDG.
@@ -154,8 +150,10 @@ NEAR Intents' 1Click API lists Robinhood Chain as `hood`, with ETH, WETH and USD
 3. They send the USDG to the deposit address from their wallet.
 
 **Notes**
-- Get a partner key from partners.near-intents.org and use it for every quote; it may remove the 0.2% fee.
+- Get a partner key from partners.near-intents.org and use it for every quote; without one every quote carries an extra 0.25%. The key stays on the server.
 - Each user's Robinhood Chain address is their connected EVM wallet. Users without one are prompted to connect or create one.
+- The keeper holds no funds: `execute` only pays the order's user at or above `minOut`, and `refund` only pays the user.
+- Tested: 9 unit tests (`npm test` in `orderbook/intents`), and `e2e/fork.sh` runs the whole flow on a fork with live 1Click prices (0.1 SOL → about 9.03 USDG → 14.66 YES). The fork run never opens a real deposit address.
 
 ## 9. FeeCollector and the $PFWA buyback
 
@@ -181,12 +179,26 @@ NEAR Intents' 1Click API lists Robinhood Chain as `hood`, with ETH, WETH and USD
 **MM agent (should have)**
 - Quote both sides around its fair-value estimate by placing limit orders, and refresh them as data changes.
 
-**Front end**
-- The engine choice in `/create`.
-- An order book market page, with the price chart from the pool tick history.
-- A trade panel, with limit orders if they ship.
-- The deposit-from-any-chain modal (§8).
-- A dispute banner and button during the challenge window.
+**Front end** (the app repo, `frontend/src`; nothing built yet)
+
+The app reads markets live over RPC with multicall (no subgraph), uses wagmi, viem and RainbowKit, and keeps trades and positions in Postgres through Prisma.
+
+1. **Config and ABIs.** New env vars for the factory, hook, resolver, limit orders and forwarder; ABIs from `orderbook/out` into `lib/abi.ts`. Order book markets keep their onchain IDs (200000 and up), clear of the legacy range (below 100000) and V2's (100000 + onchain ID).
+2. **Markets API** (`api/markets/live/route.ts`). A third loop over the new factory: `getMarket`, `getPools`, each pool's price from StateView, the resolver's state. Every market gets `engine: 'curve' | 'book'`; for a book market `chance` is the pool price × 100 and amounts are in USDG. Add an `engine` column to `LiveOracleMarket` (default `curve`) and a currency to `Trade`.
+3. **Indexer** (`api/cron/index-trades`, `lib/recordTrade.ts`). Index the PoolManager's `Swap` events for our pools, and the limit-order and resolver events, into `Trade` and `Position`.
+4. **Create** (`app/create/page.tsx`). An engine toggle next to the template tabs. For an order book market: an opening price per outcome (default even), an optional USDG seed and the creator fee (up to 2%). `handleCreate` branches to a USDG approve plus `createMarket`; the setup signature, `/api/markets/pending` and the oracle registration stay as they are.
+5. **Market page** (`app/market/[id]/page.tsx`). A new trade panel beside `OrderSlip.tsx`:
+   - buy and sell at the pool price, through the Universal Router's v4 swap, with a USDG approve (Permit2)
+   - limit orders: place, cancel, withdraw, and the user's open orders
+   - mint and burn a full set
+   - redeem after the result is final
+
+   The chart keeps the same `LineChart`, fed by indexed swaps. A dispute banner shows "Resolved: YES, final in 1h 43m", with a Dispute button (approve 50 USDG, then `dispute`), and Finalize once the window ends.
+6. **Pay from any chain.** A modal on the market page: pick a coin from 1Click's list, see the quote, get the deposit address (with a QR code), and watch the status until the tokens arrive. Server routes `/api/intents/quote` and `/api/intents/status` reuse `orderbook/intents/src` and keep the partner key server side. The keeper runs as a cron route with the relayer key, with an `IntentOrder` table instead of the JSON file.
+7. **Portfolio.** Book positions in USDG, open limit orders, winnings to redeem, and "withdraw to any chain".
+8. **Resolver bot** (`api/cron/resolve-tokens`, `api/cron/instant-resolve`). For book markets call `MarketResolver.resolveMarket`. A new step calls `finalize` once the 2 hours pass and alerts the multisig when a result is disputed. `LiveOracleMarket` gains the states between posted and final.
+
+Rough size: 4–5 days, the market page and the pay-from-any-chain modal being the largest.
 
 ## 11. Testing
 
@@ -204,15 +216,15 @@ NEAR Intents' 1Click API lists Robinhood Chain as `hood`, with ETH, WETH and USD
 
 ## 12. Hackathon plan (2–14 Nov)
 
-| Days | Work |
-|---|---|
-| 2–4 | `OBMarket`, `OutcomeToken`, `OBMarketFactory`, and unit tests for sets |
-| 4–6 | `PFWAMarketHook` (permissions, bounds, trading window, fees), plus hook address mining with CREATE2 to get the permission bits |
-| 6–8 | `MarketResolver` and `FeeCollector`. Fork test the full lifecycle |
-| 8–9 | Limit orders (`PFWALimitOrders`) wired to the hook. `IntentForwarder`, plus the backend 1Click flow |
-| 9–11 | Front end: create, market page, deposit from any chain, disputes. Indexer and resolver bot changes |
-| 11–12 | Deploy to mainnet with a per-market deposit cap. End-to-end tests with small amounts |
-| 12–13 | Demo video, README and build log |
-| 14 | Submit |
+| Days | Work | Status |
+|---|---|---|
+| 2–4 | `OBMarket`, `OutcomeToken`, `OBMarketFactory`, and unit tests for sets | Done |
+| 4–6 | `PFWAMarketHook` (bounds, trading window, fees), hook address mining with CREATE2 | Done |
+| 6–8 | `MarketResolver` and `FeeCollector`. Fork test the full lifecycle | Done |
+| 8–9 | Limit orders (`PFWALimitOrders`) wired to the hook. `IntentForwarder`, plus the 1Click flow and keeper | Done, run end to end on a fork |
+| 9–11 | Front end (§10): create, market page, pay from any chain, disputes. Indexer and resolver bot changes | Next |
+| 11–12 | Deploy to mainnet with a per-market deposit cap, once every fee, cap and bond is confirmed. End-to-end tests with small amounts | To do |
+| 12–13 | Demo video, README and build log | To do |
+| 14 | Submit | To do |
 
 **Launch safety:** a per-market cap (e.g. 1,000 USDG) and a global cap until the contracts are audited.

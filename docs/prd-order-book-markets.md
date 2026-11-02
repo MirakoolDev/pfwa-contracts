@@ -1,7 +1,14 @@
 # PRD: Order book markets
 
-**Status:** draft · **Owner:** Miracle · **Target:** NEAR Hackathon submission, 14 Nov 2026, 23:59 UTC
+**Status:** contracts and the NEAR Intents flow built and tested, front end next (see Progress) · **Owner:** Miracle · **Target:** NEAR Hackathon submission, 14 Nov 2026, 23:59 UTC
 **Technical spec:** `docs/spec-order-book-markets.md`
+
+## Progress (Nov 2 2026)
+
+- **Built and tested** in [`orderbook/`](../orderbook): the factory, markets, outcome tokens, the hook, our own limit orders, the resolver with the dispute window, the fee collector and the NEAR Intents forwarder. 37 tests pass, plus a fork test of a market's whole life against the real PoolManager and USDG.
+- **NEAR Intents** in [`orderbook/intents/`](../orderbook/intents): the 1Click client, order planning, the keeper and a CLI. Run end to end on a fork with live 1Click prices: 0.1 SOL → about 9.03 USDG → 14.66 YES in the buyer's wallet.
+- **Next:** the front end (spec §10), then mainnet once every fee, cap and bond is confirmed, a small real trade from another chain, and the demo video.
+- **Waiting on:** the launch fee rates, the per-market deposit cap, the arbitration multisig's signers, and a NEAR Intents partner key.
 
 ## Summary
 
@@ -40,20 +47,20 @@ Market types, templates, data sources and the create flow stay the same. Two thi
    - one v4 pool per outcome against USDG
 3. **The PFWA hook:**
    - only the factory can create pools on it
-   - prices stay between 0 and 1
-   - it can pause an outcome's pools
-   - it takes a trading fee inside the swap
+   - prices stay between 0.001 and 0.999
+   - trading closes at the end of trading, or as soon as a result is posted
+   - it takes a trading fee inside the swap, on the USDG side
 4. **Resolution, as today, plus a dispute window:**
    1. The market resolves exactly as bonding curve markets do: the resolver bot from the data source, or the creator, or the PFWA owner. Posting the result stops trading.
    2. For 2 hours anyone can dispute it by posting a 50 USDG bond. The PFWA multisig then confirms or corrects it; a disputer who was right gets the bond back, one who was wrong loses it.
    3. With no dispute, the result is final when the window closes, and winners redeem.
-5. **Fees:** a creator fee and a protocol fee on every swap. The protocol share buys back $PFWA, swapping USDG for $PFWA on Robinhood Chain and sending it to the PFWA treasury.
+5. **Fees:** a creator fee (set by the creator, at most 2%) and a protocol fee (at most 2%; the launch rate is still to confirm) on every swap. The protocol share buys back $PFWA, swapping USDG for $PFWA on Robinhood Chain and sending it to the PFWA treasury.
 6. **NEAR Intents:** deposit from any supported chain into a market position, and withdraw winnings back to any chain.
-7. **Front end:**
+7. **Front end** (plan in spec §10):
    - the engine choice in the create flow
-   - an order book market page with price chart, buy/sell and the user's positions
-   - a deposit-from-any-chain flow
-   - a dispute button during the challenge window
+   - an order book market page with price chart, buy/sell, limit orders and the user's positions
+   - a "pay from any chain" window, and "withdraw to any chain" from the portfolio
+   - a dispute banner and button during the challenge window
 
 8. **Limit orders** that fill inside swaps, with our own order book (`PFWALimitOrders`).
 
@@ -103,14 +110,15 @@ Market templates, data sources, the setup fingerprint, the resolver bot's data c
 
 - **Empty markets.** A new order book market has no liquidity until someone provides it. Mitigation: creator seeding, the MM agent and (later) the funding phase.
 - **Contract risk.** New contracts holding user funds. Mitigation: tests, a capped deposit size for the hackathon launch, and an audit before lifting the cap.
-- **Admin trust.** The hook's pause control and the arbitration multisig are trust points. Document them clearly, and move arbitration to $PFWA holders later.
+- **Admin trust.** The arbitration multisig and the factory owner (who sets the fee and bond for new markets and the deposit cap, and can pause new market creation) are trust points. Live markets can't be paused and their fees can't be changed. Document them clearly, and move arbitration to $PFWA holders later.
 - **Regulation.** Dollar-denominated outcome tokens look more like regulated event contracts than ETH bets do. Keep the existing region restrictions and terms.
 - **NEAR Intents dependency.** If a solver doesn't fill, the user is refunded on the source chain. The UI has to show that state clearly.
 
 ## Open questions
 
-1. Confirm that the USDG address NEAR Intents lists for Robinhood Chain (`0x5fc5…d168`) is the official one.
+1. ~~Confirm that the USDG address NEAR Intents lists for Robinhood Chain (`0x5fc5…d168`) is the official one.~~ Checked onchain Nov 2: it's Global Dollar (USDG), 6 decimals, and 1Click lists it on `hood`.
 2. Which yield-earning stablecoin, if any, is live on Robinhood Chain?
-3. Bond size: a flat amount (e.g. 50 USDG), or scaled to the market's volume?
+3. ~~Bond size: a flat amount, or scaled to the market's volume?~~ Decided: a flat 50 USDG, fixed per market at creation (the owner can change the default for new markets).
 4. Who signs on the arbitration multisig?
-5. Should the protocol's $PFWA buyback keep the tokens in the treasury, burn them, or route them to the holder pool?
+5. Should the protocol's $PFWA buyback keep the tokens in the treasury, burn them, or route them to the holder pool? The fee collector supports hold or burn; it's set when it's deployed, and the default is hold.
+6. The launch fee rates and the per-market deposit cap.

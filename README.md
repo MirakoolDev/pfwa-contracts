@@ -1,6 +1,6 @@
 # PFWA Contracts
 
-The smart contracts that power **[pfwa.fun](https://pfwa.fun)**, an on-chain prediction market protocol on **Robinhood Chain** where every outcome trades on its own bonding curve.
+The smart contracts that power **[pfwa.fun](https://pfwa.fun)**, an onchain prediction market protocol on **Robinhood Chain**. Its live markets trade on bonding curves; order book markets, where outcomes are backed 1:1 by USDG and trade in Uniswap v4 pools, are being built in [`orderbook/`](orderbook/).
 
 Every market, trade, resolution and payout on pfwa.fun goes through these contracts. They have been live on Robinhood Chain mainnet since July 31, 2026, and **121 markets** have been created through them so far (see [Deployments](#deployments-robinhood-chain) and [Timeline](#timeline)).
 
@@ -12,8 +12,9 @@ Every market, trade, resolution and payout on pfwa.fun goes through these contra
 A second market engine, in [`orderbook/`](orderbook/): each outcome is a token backed 1:1 by USDG and trades in its own Uniswap v4 pool through one PFWA hook, with limit orders, the same data-source resolution as the bonding curve markets plus a 2-hour dispute window, and buying from any chain through NEAR Intents. Product and technical docs: [`docs/prd-order-book-markets.md`](docs/prd-order-book-markets.md), [`docs/spec-order-book-markets.md`](docs/spec-order-book-markets.md).
 
 - **What existed before the hackathon:** everything outside `orderbook/` and `docs/`: the bonding curve contracts in `src/`, live on Robinhood Chain since July 31, 2026.
-- **What was built during it:** `orderbook/` and `docs/`. The full diff: [main...order-book-markets](https://github.com/MirakoolDev/pfwa-contracts/compare/main...order-book-markets).
+- **What was built during it:** `orderbook/` and `docs/`. The full diff since the last pre-hackathon commit: [8f4ff32...main](https://github.com/MirakoolDev/pfwa-contracts/compare/8f4ff32...main).
 - **The NEAR integration:** [`orderbook/intents/`](orderbook/intents/README.md). A trader pays with an asset on any chain NEAR Intents supports (SOL, USDC on Base, BTC, …) and receives outcome tokens on Robinhood Chain, through the 1Click API and our `ForwarderFactory`. Winnings go back the same way. Try it: `cd orderbook/intents && npm install && node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana address> --user <0x…> --market 200000 --outcome 0 --dry`, or run the whole flow on a fork with `bash e2e/fork.sh`.
+- **Status (Nov 2):** contracts and the NEAR Intents flow built and tested; not deployed yet; the app's front end is next ([spec §10](docs/spec-order-book-markets.md)).
 - **Build and test:** `git submodule update --init --recursive`, then `cd orderbook && forge test` (contracts, see [`orderbook/README.md`](orderbook/README.md)) and `cd orderbook/intents && npm test` (the NEAR Intents flow).
 
 ## How it works (bonding curve markets)
@@ -107,7 +108,7 @@ Market counts are as of September 11, 2026 and can be checked by calling `market
 
 ## Timeline
 
-PFWA was built over about six weeks inside the private pfwa.fun monorepo (frontend, relayer, indexer and these contracts; 128 commits since July 31). This repository is the public extraction of the contracts, which is why its own git history starts at a single commit. The on-chain record below can be checked independently on [Blockscout](https://robinhoodchain.blockscout.com).
+PFWA was built over about six weeks inside the private pfwa.fun monorepo (frontend, relayer, indexer and these contracts; 128 commits since July 31). This repository is the public extraction of the contracts, which is why its own git history starts at a single commit. The onchain record below can be checked independently on [Blockscout](https://robinhoodchain.blockscout.com).
 
 | Date (2026) | Milestone |
 |---|---|
@@ -132,7 +133,7 @@ PFWA was built over about six weeks inside the private pfwa.fun monorepo (fronte
 
 These contracts are not permissionless end-to-end. It's worth being explicit about what is trusted:
 
-- **Resolution is oracle-based.** Outcomes are set by the market creator (for user markets) or the protocol relayer/owner (for automated markets), using public Dune data. There is no on-chain dispute mechanism.
+- **Resolution is oracle-based.** Outcomes are set by the market creator (for user markets) or the protocol relayer/owner (for automated markets), using public Dune data. Bonding curve markets have no onchain dispute mechanism; order book markets add a 2-hour dispute window with a 50 USDG bond, settled by the owner multisig.
 - **Owner powers.** The factory owner can pause market creation, pause trading on a market, change the relayer, treasury, default curve and fee parameters, and recover stray ETH/ERC-20s. Per-market fees can only ever be **lowered** after creation.
 - **Chain-specific config.** The PFWA token, DEX router and WETH addresses used for buyback & burn are set to Robinhood Chain defaults in `PFWAMarketFactory` and can be changed by the owner.
 
