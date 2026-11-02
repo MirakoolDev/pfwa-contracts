@@ -134,14 +134,14 @@ contract OrderBookTest is Test {
     // ── Helpers ─────────────────────────────────────────────────────────────────
 
     function _deployHook() internal returns (PFWAMarketHook h) {
-        bytes memory code = abi.encodePacked(type(PFWAMarketHook).creationCode, abi.encode(address(pm), address(usdg)));
+        bytes memory code = abi.encodePacked(type(PFWAMarketHook).creationCode, abi.encode(address(pm), address(usdg), address(this)));
         bytes32 codeHash = keccak256(code);
         for (uint256 salt; salt < 200_000; salt++) {
             address predicted = address(
                 uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), bytes32(salt), codeHash))))
             );
             if (uint160(predicted) & Hooks.ALL_HOOK_MASK == FLAGS) {
-                h = new PFWAMarketHook{salt: bytes32(salt)}(pm, IERC20(address(usdg)));
+                h = new PFWAMarketHook{salt: bytes32(salt)}(pm, IERC20(address(usdg)), address(this));
                 require(address(h) == predicted, "miner");
                 return h;
             }
@@ -229,6 +229,15 @@ contract OrderBookTest is Test {
 
     function test_creationFeeGoesToCollector() public view {
         assertEq(usdg.balanceOf(address(collector)), 1e6);
+    }
+
+    function test_onlyTheNamedDeployerSetsUpTheHookOnce() public {
+        vm.prank(alice);
+        vm.expectRevert(PFWAMarketHook.NotDeployer.selector);
+        hook.setup(alice, alice, ITickMoveListener(address(0)));
+        vm.expectRevert(PFWAMarketHook.AlreadySet.selector);
+        hook.setup(alice, alice, ITickMoveListener(address(0)));
+        assertEq(hook.deployer(), address(this), "the account passed in, not the CREATE2 deployer");
     }
 
     function test_onlyFactoryCanCreatePools() public {
@@ -492,6 +501,27 @@ contract OrderBookTest is Test {
         assertGt(out, 0);
         assertEq(_outcome(yesKey).balanceOf(alice) - before, out);
         assertEq(usdg.balanceOf(deposit), 0);
+    }
+
+    function test_aBigCrossChainOrderStopsAtThePriceBoundAndReturnsTheRest() public {
+        ForwarderFactory.Order memory o = ForwarderFactory.Order({
+            user: alice,
+            marketId: marketId,
+            outcome: 0,
+            minOut: 1,
+            deadline: uint64(block.timestamp + 1 hours),
+            nonce: 7
+        });
+        address deposit = forwarder.depositAddress(o);
+        usdg.mint(deposit, 50_000e6); // far more than the seeded pool can take before 0.999
+        uint256 usdgBefore = usdg.balanceOf(alice);
+        uint256 out = forwarder.execute(o);
+        assertGt(out, 0);
+        uint256 back = usdg.balanceOf(alice) - usdgBefore;
+        assertGt(back, 40_000e6, "the unspent USDG returns to the user");
+        assertLe(_priceBps(yesKey), 9_990, "the price stops at the bound");
+        assertEq(usdg.balanceOf(deposit), 0);
+        assertEq(usdg.balanceOf(address(forwarder)), 0);
     }
 
     function test_forwarderRefund() public {

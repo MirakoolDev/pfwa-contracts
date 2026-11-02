@@ -85,10 +85,12 @@ contract PFWAMarketHook is IHooks {
         _;
     }
 
-    constructor(IPoolManager poolManager_, IERC20 usdg_) {
+    /// @param deployer_ The one account that may call `setup`. Passed in, not msg.sender: the hook is deployed at a
+    /// mined CREATE2 address, so msg.sender is the CREATE2 deployer.
+    constructor(IPoolManager poolManager_, IERC20 usdg_, address deployer_) {
         poolManager = poolManager_;
         usdg = usdg_;
-        deployer = msg.sender;
+        deployer = deployer_;
         Hooks.validateHookPermissions(IHooks(address(this)), getHookPermissions());
     }
 

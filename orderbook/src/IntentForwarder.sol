@@ -10,9 +10,11 @@ import {IUnlockCallback} from "v4-core/src/interfaces/callback/IUnlockCallback.s
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
+import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {SwapParams} from "v4-core/src/types/PoolOperation.sol";
 import {OBMarketFactory} from "./OBMarketFactory.sol";
+import {PFWAMarketHook} from "./PFWAMarketHook.sol";
 
 /// @title IntentDeposit
 /// @notice A one-time deposit address for a cross-chain order. NEAR Intents delivers USDG here; the
@@ -47,6 +49,7 @@ contract IntentDeposit {
 ///    deadline. The USDG goes back to the user.
 contract ForwarderFactory is IUnlockCallback, ReentrancyGuard {
     using SafeERC20 for IERC20;
+    using PoolIdLibrary for PoolKey;
 
     struct Order {
         address user; // receives the outcome tokens or the refund
@@ -62,6 +65,7 @@ contract ForwarderFactory is IUnlockCallback, ReentrancyGuard {
         bool zeroForOne;
         uint256 amountIn;
         address recipient;
+        uint160 sqrtPriceLimitX96;
     }
 
     IPoolManager public immutable poolManager;
@@ -105,8 +109,13 @@ contract ForwarderFactory is IUnlockCallback, ReentrancyGuard {
         bool usdgIsCurrency0 = Currency.unwrap(key.currency0) == address(usdg);
         IERC20 outcomeToken = IERC20(Currency.unwrap(usdgIsCurrency0 ? key.currency1 : key.currency0));
 
+        // Stop at the pool's price bound (0.999 USDG per outcome) instead of failing: the hook rejects a swap that
+        // ends past it, and whatever USDG the bound leaves unspent goes back to the user below.
+        (,, int24 tickLower, int24 tickUpper,,,,) = PFWAMarketHook(address(key.hooks)).pools(key.toId());
+        uint160 limit = usdgIsCurrency0 ? TickMath.getSqrtPriceAtTick(tickLower + 1) : TickMath.getSqrtPriceAtTick(tickUpper);
+
         uint256 before = outcomeToken.balanceOf(o.user);
-        poolManager.unlock(abi.encode(SwapCallback(key, usdgIsCurrency0, amountIn, o.user)));
+        poolManager.unlock(abi.encode(SwapCallback(key, usdgIsCurrency0, amountIn, o.user, limit)));
         tokensOut = outcomeToken.balanceOf(o.user) - before;
         if (tokensOut < o.minOut) revert InsufficientOutput(tokensOut, o.minOut);
 
@@ -133,7 +142,7 @@ contract ForwarderFactory is IUnlockCallback, ReentrancyGuard {
             SwapParams({
                 zeroForOne: s.zeroForOne,
                 amountSpecified: -int256(s.amountIn),
-                sqrtPriceLimitX96: s.zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
+                sqrtPriceLimitX96: s.sqrtPriceLimitX96
             }),
             ""
         );
@@ -141,7 +150,7 @@ contract ForwarderFactory is IUnlockCallback, ReentrancyGuard {
         Currency inCur = s.zeroForOne ? s.key.currency0 : s.key.currency1;
         Currency outCur = s.zeroForOne ? s.key.currency1 : s.key.currency0;
 
-        uint256 owed = uint256(int256(-inDelta));
+        uint256 owed = uint256(int256(-inDelta)); // what the swap used, which is less than amountIn at the bound
         poolManager.sync(inCur);
         IERC20(Currency.unwrap(inCur)).safeTransfer(address(poolManager), owed);
         poolManager.settle();

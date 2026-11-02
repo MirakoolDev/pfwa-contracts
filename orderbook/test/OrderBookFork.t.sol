@@ -143,14 +143,14 @@ contract OrderBookForkTest is Test {
     }
 
     function _deployHook() internal returns (PFWAMarketHook h) {
-        bytes memory code = abi.encodePacked(type(PFWAMarketHook).creationCode, abi.encode(address(PM), address(USDG)));
+        bytes memory code = abi.encodePacked(type(PFWAMarketHook).creationCode, abi.encode(address(PM), address(USDG), address(this)));
         bytes32 codeHash = keccak256(code);
         for (uint256 salt; salt < 400_000; salt++) {
             address predicted = address(
                 uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), bytes32(salt), codeHash))))
             );
             if (uint160(predicted) & Hooks.ALL_HOOK_MASK == FLAGS && predicted.code.length == 0) {
-                h = new PFWAMarketHook{salt: bytes32(salt)}(PM, USDG);
+                h = new PFWAMarketHook{salt: bytes32(salt)}(PM, USDG, address(this));
                 return h;
             }
         }

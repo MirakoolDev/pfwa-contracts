@@ -33,9 +33,9 @@ contract Deploy is Script {
 
         // The hook's address must carry its permission bits, so mine a CREATE2 salt.
         // The broadcasting wallet is the hook's deployer (it calls setup once below).
-        bytes memory code = abi.encodePacked(type(PFWAMarketHook).creationCode, abi.encode(POOL_MANAGER, usdg));
+        bytes memory code = abi.encodePacked(type(PFWAMarketHook).creationCode, abi.encode(POOL_MANAGER, usdg, vm.addr(pk)));
         bytes32 salt = _mine(keccak256(code));
-        PFWAMarketHook hook = new PFWAMarketHook{salt: salt}(POOL_MANAGER, usdg);
+        PFWAMarketHook hook = new PFWAMarketHook{salt: salt}(POOL_MANAGER, usdg, vm.addr(pk));
 
         FeeCollector collector = new FeeCollector(
             vm.addr(pk),

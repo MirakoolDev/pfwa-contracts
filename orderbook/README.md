@@ -13,7 +13,7 @@ Contracts for PFWA's second market engine. Each outcome is a token backed 1:1 by
 | `src/MarketResolver.sol` | `MarketResolver` | Resolves exactly as PFWA's bonding curve markets do (`resolveMarket`: the creator, the relayer for platform markets, the owner, or the relayer or owner 24 hours after the deadline), which stops trading. The result is final after a 2-hour window unless someone disputes it with the market's bond (50 USDG); the owner multisig then settles it, and a disputer who was right gets the bond back. |
 | `src/FeeCollector.sol` | `FeeCollector` | Receives protocol USDG and buys back $PFWA through a V3 path. Only the owner or keeper can trigger it, at most hourly, with a quoted minimum-out. It sends to the treasury, or burns if configured. |
 | `src/PFWALimitOrders.sol` | `PFWALimitOrders` | Limit orders. An order is one-sided liquidity in one price step on the far side of the price; when a swap moves the price fully through it, it has filled. Orders at the same step share one position. Filled in the swap that crosses them (up to 8 a swap), or later by anyone with `fill`. Cancel any time, withdraw once filled. No owner, no fee. |
-| `src/IntentForwarder.sol` | `ForwarderFactory`, `IntentDeposit` | NEAR Intents entry. Each cross-chain order gets a deterministic deposit address. Once USDG lands there, `execute` buys the outcome for the user (respecting `minOut`), and `refund` returns the USDG. |
+| `src/IntentForwarder.sol` | `ForwarderFactory`, `IntentDeposit` | NEAR Intents entry. Each cross-chain order gets a deterministic deposit address. Once USDG lands there, `execute` buys the outcome for the user (respecting `minOut`, and stopping at the price bound with the rest returned), and `refund` returns the USDG. The off-chain side (1Click quotes, the keeper, a CLI and an end-to-end fork run) is in [`intents/`](intents/README.md). |
 
 ### Choices to know about
 - **No admin pausing.** Trading closes at the market's end of trading, or as soon as a result is posted (a data source can settle a market early, as on bonding curve markets), and never reopens. No admin can pause a market or change a live market's fees or bounds.
@@ -51,7 +51,8 @@ npm install && npm test   # Hardhat 3 (Solidity tests)
 - disputes: only on a pending result, once, inside the window; a disputer who was right gets the bond back, one who was wrong loses it to the fee collector
 - invalid markets
 - buybacks, including the keeper restriction
-- cross-chain execute and refund
+- cross-chain execute and refund, and a big cross-chain order stopping at the price bound with the rest returned
+- only the named deployer sets up the hook (it's deployed through the CREATE2 deployer)
 - limit orders: sells filled by a buy and buys filled by a sell crossing them, cancels (also after the market closes), orders at one price sharing the fill pro rata, the per-swap cap with anyone filling the rest, placement rules (far side, on the spacing, inside the bounds, trading open), only the hook reporting moves; fuzz: makers always get their share and the book stays solvent
 - the per-market deposit cap, and implementations that can't be initialised
 - fuzz: fees never exceed the configured rate; random buys, sells, mints and burns never touch a market's collateral (every outcome stays backed 1:1) and the hook holds exactly the fees it owes
@@ -62,7 +63,7 @@ npm install && npm test   # Hardhat 3 (Solidity tests)
 ROBINHOOD_RPC_URL=<rpc> forge test --match-contract OrderBookForkTest
 ```
 
-36 tests, all passing (35 local, 1 fork).
+38 tests, all passing (37 local, 1 fork).
 
 **Price bounds and routers:** a swap that would push an outcome past 0.001 or 0.999 USDG reverts. Front ends and the forwarder should set `sqrtPriceLimitX96` at the pool's bound so a big order stops there instead of failing.
 

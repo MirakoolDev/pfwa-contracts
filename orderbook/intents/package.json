@@ -1,0 +1,15 @@
+{
+  "name": "pfwa-intents",
+  "private": true,
+  "type": "module",
+  "description": "Buy PFWA order book market outcomes from any chain, and withdraw winnings to any chain, through NEAR Intents (1Click).",
+  "bin": { "pfwa-intents": "cli.mjs" },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "cli": "node cli.mjs"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "viem": "2.55.10"
+  }
+}

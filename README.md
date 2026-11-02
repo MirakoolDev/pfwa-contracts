@@ -13,7 +13,8 @@ A second market engine, in [`orderbook/`](orderbook/): each outcome is a token b
 
 - **What existed before the hackathon:** everything outside `orderbook/` and `docs/`: the bonding curve contracts in `src/`, live on Robinhood Chain since July 31, 2026.
 - **What was built during it:** `orderbook/` and `docs/`. The full diff: [main...order-book-markets](https://github.com/MirakoolDev/pfwa-contracts/compare/main...order-book-markets).
-- **Build and test:** `git submodule update --init --recursive`, then `cd orderbook && forge test` (see [`orderbook/README.md`](orderbook/README.md)).
+- **The NEAR integration:** [`orderbook/intents/`](orderbook/intents/README.md). A trader pays with an asset on any chain NEAR Intents supports (SOL, USDC on Base, BTC, …) and receives outcome tokens on Robinhood Chain, through the 1Click API and our `ForwarderFactory`. Winnings go back the same way. Try it: `cd orderbook/intents && npm install && node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana address> --user <0x…> --market 200000 --outcome 0 --dry`, or run the whole flow on a fork with `bash e2e/fork.sh`.
+- **Build and test:** `git submodule update --init --recursive`, then `cd orderbook && forge test` (contracts, see [`orderbook/README.md`](orderbook/README.md)) and `cd orderbook/intents && npm test` (the NEAR Intents flow).
 
 ## How it works (bonding curve markets)
 
