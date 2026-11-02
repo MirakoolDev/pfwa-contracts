@@ -1,0 +1,7 @@
+{
+  "name": "pfwa-orderbook",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "hardhat test solidity" },
+  "devDependencies": { "hardhat": "3.21.2" }
+}

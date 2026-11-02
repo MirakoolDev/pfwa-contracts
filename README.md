@@ -7,9 +7,17 @@ Every market, trade, resolution and payout on pfwa.fun goes through these contra
 - App: [pfwa.fun](https://pfwa.fun)
 - Chain: Robinhood Chain (chainId `4663`), RPC `https://rpc.mainnet.chain.robinhood.com`
 
-## How it works
+## Order book markets (new, built for the NEAR Hackathon, Nov 1–14 2026)
 
-There is no order book and no counterparty matching. Each option in a market (e.g. `YES` / `NO`, or up to 10 choices) is its own ERC-20 token priced by a linear bonding curve. Buying an option mints tokens and adds ETH to that option's reserve; the price rises as more people buy it, so the relative prices of the options act as the market's implied probabilities.
+A second market engine, in [`orderbook/`](orderbook/): each outcome is a token backed 1:1 by USDG and trades in its own Uniswap v4 pool through one PFWA hook, with limit orders, the same data-source resolution as the bonding curve markets plus a 2-hour dispute window, and buying from any chain through NEAR Intents. Product and technical docs: [`docs/prd-order-book-markets.md`](docs/prd-order-book-markets.md), [`docs/spec-order-book-markets.md`](docs/spec-order-book-markets.md).
+
+- **What existed before the hackathon:** everything outside `orderbook/` and `docs/`: the bonding curve contracts in `src/`, live on Robinhood Chain since July 31, 2026.
+- **What was built during it:** `orderbook/` and `docs/`. The full diff: [main...order-book-markets](https://github.com/MirakoolDev/pfwa-contracts/compare/main...order-book-markets).
+- **Build and test:** `git submodule update --init --recursive`, then `cd orderbook && forge test` (see [`orderbook/README.md`](orderbook/README.md)).
+
+## How it works (bonding curve markets)
+
+The bonding curve engine has no order book and no counterparty matching. Each option in a market (e.g. `YES` / `NO`, or up to 10 choices) is its own ERC-20 token priced by a linear bonding curve. Buying an option mints tokens and adds ETH to that option's reserve; the price rises as more people buy it, so the relative prices of the options act as the market's implied probabilities.
 
 When the market resolves, the ETH in every losing option's reserve is moved into the winning option, and each winning token becomes redeemable for a fixed amount of ETH.
 
