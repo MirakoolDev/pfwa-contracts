@@ -180,7 +180,7 @@ NEAR Intents' 1Click API lists Robinhood Chain as `hood`, with ETH, WETH and USD
 **MM agent (should have)**
 - Quote both sides around its fair-value estimate by placing limit orders, and refresh them as data changes.
 
-**Front end** (the app repo, `frontend/src`; nothing built yet)
+**Front end** (the app repo, `frontend/src`; built as `/book`, `/book/create` and `/book/[id]`, steps 1–2 and 7–8 still to do)
 
 The app reads markets live over RPC with multicall (no subgraph), uses wagmi, viem and RainbowKit, and keeps trades and positions in Postgres through Prisma.
 
@@ -223,7 +223,7 @@ Rough size: 4–5 days, the market page and the pay-from-any-chain modal being t
 | 4–6 | `PFWAMarketHook` (bounds, trading window, fees), hook address mining with CREATE2 | Done |
 | 6–8 | `MarketResolver` and `FeeCollector`. Fork test the full lifecycle | Done |
 | 8–9 | Limit orders (`PFWALimitOrders`) wired to the hook. `IntentForwarder`, plus the 1Click flow and keeper | Done, run end to end on a fork |
-| 9–11 | Front end (§10): create, market page, pay from any chain, disputes. Indexer and resolver bot changes | Next |
+| 9–11 | Front end (§10): create, market page, pay from any chain, disputes. Indexer and resolver bot changes | Front end done and run end to end on a local copy of Robinhood Chain (create, trade, limit orders, sets, liquidity in and out, disputes, redeem, pay from any chain with a live 1Click price). Indexer and resolver bot: to do |
 | 11–12 | Deploy to mainnet with a per-market deposit cap, once every fee, cap and bond is confirmed. End-to-end tests with small amounts | To do |
 | 12–13 | Demo video, README and build log | To do |
 | 14 | Submit | To do |
