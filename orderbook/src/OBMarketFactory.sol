@@ -43,7 +43,7 @@ contract OBMarketFactory is Ownable {
 
     uint256 public constant FIRST_MARKET_ID = 200_000;
     uint256 public constant MAX_OUTCOMES = 10;
-    uint16 public constant MAX_CREATOR_FEE_BPS = 200;
+    uint16 public constant MAX_CREATOR_FEE_BPS = 100;
     /// Longest rules text, in bytes.
     uint256 public constant MAX_RULES_LENGTH = 2_000;
     uint16 public constant MAX_PROTOCOL_FEE_BPS = 200;

@@ -258,6 +258,27 @@ contract OrderBookTest is Test {
         vm.stopPrank();
     }
 
+    function test_theCreatorFeeIsAtMostOnePercent() public {
+        string[] memory names = new string[](2);
+        names[0] = "YES";
+        names[1] = "NO";
+        OBMarketFactory.CreateParams memory p = OBMarketFactory.CreateParams({
+            setupHash: keccak256("fee"),
+            question: "Fee?",
+            rules: "YES if the fee is right.",
+            outcomeNames: names,
+            openingBps: new uint16[](0),
+            endOfTrading: uint64(block.timestamp + 1 days),
+            creatorFeeBps: 101
+        });
+        vm.startPrank(creator);
+        vm.expectRevert(OBMarketFactory.FeeTooHigh.selector);
+        factory.createMarket(p);
+        p.creatorFeeBps = 100;
+        factory.createMarket(p);
+        vm.stopPrank();
+    }
+
     function test_creationFeeGoesToCollector() public view {
         assertEq(usdg.balanceOf(address(collector)), 1e6);
     }

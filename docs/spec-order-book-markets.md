@@ -49,7 +49,7 @@ struct MarketConfig {
     uint64  endOfTrading;     // trading closes for good at this time (or earlier, when a result is posted)
     uint8   outcomeCount;     // 2..10
     address creator;
-    uint16  creatorFeeBps;    // set by the creator, at most 200 (2%)
+    uint16  creatorFeeBps;    // set by the creator, at most 100 (1%)
     uint16  protocolFeeBps;   // the factory's current rate, at most 200 (2%); the launch rate is still to confirm
 }
 
@@ -187,7 +187,7 @@ The app reads markets live over RPC with multicall (no subgraph), uses wagmi, vi
 1. **Config and ABIs.** New env vars for the factory, hook, resolver, limit orders and forwarder; ABIs from `orderbook/out` into `lib/abi.ts`. Order book markets keep their onchain IDs (200000 and up), clear of the legacy range (below 100000) and V2's (100000 + onchain ID).
 2. **Markets API** (`api/markets/live/route.ts`). A third loop over the new factory: `getMarket`, `getPools`, each pool's price from StateView, the resolver's state. Every market gets `engine: 'curve' | 'book'`; for a book market `chance` is the pool price × 100 and amounts are in USDG. Add an `engine` column to `LiveOracleMarket` (default `curve`) and a currency to `Trade`.
 3. **Indexer** (`api/cron/index-trades`, `lib/recordTrade.ts`). Index the PoolManager's `Swap` events for our pools, and the limit-order and resolver events, into `Trade` and `Position`.
-4. **Create** (`app/create/page.tsx`). An engine toggle next to the template tabs. For an order book market: an opening price per outcome (default even), an optional USDG seed and the creator fee (up to 2%). `handleCreate` branches to a USDG approve plus `createMarket`; the setup signature, `/api/markets/pending` and the oracle registration stay as they are.
+4. **Create** (`app/create/page.tsx`). An engine toggle next to the template tabs. For an order book market: an opening price per outcome (default even), an optional USDG seed and the creator fee (up to 1%). `handleCreate` branches to a USDG approve plus `createMarket`; the setup signature, `/api/markets/pending` and the oracle registration stay as they are.
 5. **Market page** (`app/market/[id]/page.tsx`). A new trade panel beside `OrderSlip.tsx`:
    - buy and sell at the pool price, through the Universal Router's v4 swap, with a USDG approve (Permit2)
    - limit orders: place, cancel, withdraw, and the user's open orders

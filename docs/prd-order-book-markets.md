@@ -54,7 +54,7 @@ Market types, templates, data sources and the create flow stay the same. Two thi
    1. The market resolves exactly as bonding curve markets do: the resolver bot from the data source, or the creator, or the PFWA owner. Posting the result stops trading.
    2. For 2 hours anyone can dispute it by posting a 50 USDG bond. The PFWA multisig then confirms or corrects it; a disputer who was right gets the bond back, one who was wrong loses it.
    3. With no dispute, the result is final when the window closes, and winners redeem.
-5. **Fees:** a creator fee (set by the creator, at most 2%) and a protocol fee (at most 2%; the launch rate is still to confirm) on every swap. The protocol share buys back $PFWA, swapping USDG for $PFWA on Robinhood Chain and sending it to the PFWA treasury.
+5. **Fees:** a creator fee (set by the creator, at most 1%) and a protocol fee (1% at launch, at most 2%) on every swap. The protocol share buys back $PFWA, swapping USDG for $PFWA on Robinhood Chain and sending it to the PFWA treasury.
 6. **NEAR Intents:** deposit from any supported chain into a market position, and withdraw winnings back to any chain.
 7. **Front end** (plan in spec §10):
    - the engine choice in the create flow
