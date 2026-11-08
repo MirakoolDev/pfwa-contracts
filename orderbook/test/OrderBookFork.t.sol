@@ -74,6 +74,7 @@ contract OrderBookForkTest is Test {
             OBMarketFactory.CreateParams({
                 setupHash: keccak256("fork"),
                 question: "Fork test: will it rain?",
+                rules: "YES if the test says so, otherwise NO.",
                 outcomeNames: names,
                 openingBps: opening,
                 endOfTrading: uint64(block.timestamp + 1 days),

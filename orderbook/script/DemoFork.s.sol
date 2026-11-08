@@ -58,6 +58,7 @@ contract DemoFork is Script {
             OBMarketFactory.CreateParams({
                 setupHash: keccak256("demo"),
                 question: "Will it rain tomorrow?",
+                rules: "YES if the weather service reports rain in the city before trading ends. Otherwise NO.",
                 outcomeNames: names,
                 openingBps: opening,
                 endOfTrading: uint64(block.timestamp + 7 days),

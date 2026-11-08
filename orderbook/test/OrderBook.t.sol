@@ -117,6 +117,7 @@ contract OrderBookTest is Test {
             OBMarketFactory.CreateParams({
                 setupHash: keccak256("rain"),
                 question: "Will it rain tomorrow?",
+                rules: "YES if it rains in the city before trading ends, per the weather service. Otherwise NO.",
                 outcomeNames: names,
                 openingBps: opening,
                 endOfTrading: uint64(block.timestamp + 1 days),
@@ -225,6 +226,36 @@ contract OrderBookTest is Test {
     function test_opensAtTheCreatorsPrices() public view {
         assertApproxEqAbs(_priceBps(yesKey), 6_000, 2);
         assertApproxEqAbs(_priceBps(noKey), 4_000, 2);
+    }
+
+    function test_theRulesAreStoredWithTheMarket() public view {
+        OBMarketFactory.MarketInfo memory info = factory.getMarket(marketId);
+        assertEq(info.rules, "YES if it rains in the city before trading ends, per the weather service. Otherwise NO.");
+        assertEq(info.question, "Will it rain tomorrow?");
+    }
+
+    function test_aMarketNeedsRulesOfAtMostTwoThousandBytes() public {
+        string[] memory names = new string[](2);
+        names[0] = "YES";
+        names[1] = "NO";
+        OBMarketFactory.CreateParams memory p = OBMarketFactory.CreateParams({
+            setupHash: keccak256("rules"),
+            question: "Rules?",
+            rules: "",
+            outcomeNames: names,
+            openingBps: new uint16[](0),
+            endOfTrading: uint64(block.timestamp + 1 days),
+            creatorFeeBps: 0
+        });
+        vm.startPrank(creator);
+        vm.expectRevert(OBMarketFactory.BadRules.selector);
+        factory.createMarket(p);
+        p.rules = string(new bytes(2_001));
+        vm.expectRevert(OBMarketFactory.BadRules.selector);
+        factory.createMarket(p);
+        p.rules = string(new bytes(2_000));
+        factory.createMarket(p);
+        vm.stopPrank();
     }
 
     function test_creationFeeGoesToCollector() public view {
@@ -586,6 +617,7 @@ contract OrderBookTest is Test {
             OBMarketFactory.CreateParams({
                 setupHash: keccak256("cap"),
                 question: "Capped?",
+                rules: "YES if it rains in the city before trading ends, per the weather service. Otherwise NO.",
                 outcomeNames: names,
                 openingBps: new uint16[](0),
                 endOfTrading: uint64(block.timestamp + 1 days),

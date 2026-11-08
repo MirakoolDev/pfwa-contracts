@@ -24,8 +24,9 @@ contract OBMarketFactory is Ownable {
     using SafeERC20 for IERC20;
 
     struct CreateParams {
-        bytes32 setupHash; // fingerprint of the market's rules and data source
+        bytes32 setupHash; // fingerprint of the market's full setup (question, outcomes, rules, end of trading)
         string question;
+        string rules; // how the outcome is decided and from what source: what disputes are judged against
         string[] outcomeNames; // 2..10
         uint16[] openingBps; // opening price per outcome in bps of 1 USDG; empty = even split
         uint64 endOfTrading;
@@ -37,11 +38,14 @@ contract OBMarketFactory is Ownable {
         address creator;
         bytes32 setupHash;
         string question;
+        string rules;
     }
 
     uint256 public constant FIRST_MARKET_ID = 200_000;
     uint256 public constant MAX_OUTCOMES = 10;
     uint16 public constant MAX_CREATOR_FEE_BPS = 200;
+    /// Longest rules text, in bytes.
+    uint256 public constant MAX_RULES_LENGTH = 2_000;
     uint16 public constant MAX_PROTOCOL_FEE_BPS = 200;
     int24 public constant TICK_SPACING = 10;
     /// Price bounds in bps of 1 USDG: 0.001 and 0.999.
@@ -75,6 +79,8 @@ contract OBMarketFactory is Ownable {
         address[] outcomes,
         uint64 endOfTrading
     );
+    /// The market's rules, stored with it (getMarket) and logged here for indexers.
+    event MarketRules(uint256 indexed marketId, string rules);
     event ParamsUpdated(uint16 protocolFeeBps, uint256 creationFee, uint256 defaultBond);
     event CreationPaused(bool paused);
     event DepositCapSet(uint256 depositCap);
@@ -84,6 +90,7 @@ contract OBMarketFactory is Ownable {
     error BadOpeningPrices();
     error BadEndOfTrading();
     error FeeTooHigh();
+    error BadRules();
     error UnknownMarket();
 
     constructor(
@@ -111,6 +118,8 @@ contract OBMarketFactory is Ownable {
         if (n < 2 || n > MAX_OUTCOMES) revert BadOutcomeCount();
         if (p.endOfTrading <= block.timestamp) revert BadEndOfTrading();
         if (p.creatorFeeBps > MAX_CREATOR_FEE_BPS) revert FeeTooHigh();
+        uint256 rulesLength = bytes(p.rules).length;
+        if (rulesLength == 0 || rulesLength > MAX_RULES_LENGTH) revert BadRules();
         uint16[] memory opening = _openingPrices(p.openingBps, n);
 
         if (creationFee > 0) usdg.safeTransferFrom(msg.sender, hook.feeCollector(), creationFee);
@@ -125,7 +134,7 @@ contract OBMarketFactory is Ownable {
             tokenAddrs[i] = address(tokens[i]);
         }
         market.initialize(address(this), address(resolver), usdg, marketId, p.endOfTrading, depositCap, tokens);
-        _markets[marketId] = MarketInfo(market, msg.sender, p.setupHash, p.question);
+        _markets[marketId] = MarketInfo(market, msg.sender, p.setupHash, p.question, p.rules);
 
         for (uint256 i; i < n; i++) {
             _openPool(marketId, market, address(tokens[i]), opening[i], msg.sender, p.creatorFeeBps);
@@ -133,6 +142,7 @@ contract OBMarketFactory is Ownable {
 
         resolver.register(marketId, market, msg.sender, p.endOfTrading, defaultBond);
         emit MarketCreated(marketId, address(market), msg.sender, p.setupHash, p.question, tokenAddrs, p.endOfTrading);
+        emit MarketRules(marketId, p.rules);
     }
 
     function _openPool(

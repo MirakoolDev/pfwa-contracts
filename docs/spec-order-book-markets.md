@@ -63,13 +63,14 @@ function redeem(uint256 amount, address to) external;     // after resolution: b
 
 - **Market IDs** start at `200000` so they never collide with the bonding curve factories.
 - **Creation fee:** a flat USDG amount, sent to `FeeCollector`.
+- **Rules onchain:** `createMarket` takes the market's rules (how the outcome is decided, and from what source), 1 to 2,000 bytes, and the factory stores them with the market (`getMarket(id).rules`) and logs them in `MarketRules(id, rules)`. Disputes are judged against them, and nobody can change them after creation. `setupHash` stays the fingerprint of the whole setup.
 
 ## 4. Pools
 
 For each outcome `i`:
 - **Pool key:** `{currency0, currency1} = sort(OUTCOME_i, USDG)`, `fee = 0` (the hook charges the fee), `tickSpacing = 10`, `hooks = PFWAMarketHook`.
 - **Initial price:** set from the creator's opening probability. The default is an even 1/N.
-- **Seeding:** the creator can provide liquidity by minting complete sets and adding concentrated liquidity between the price bounds. The factory exposes `createAndSeed`.
+- **Seeding:** the creator can provide liquidity by minting complete sets and adding concentrated liquidity between the price bounds. The front end does this after creation (`mintSet`, then one PositionManager position per pool across the bounds), and takes it out again the same way; there is no `createAndSeed` in the factory.
 
 **Price bounds:** each outcome must trade between `P_MIN = 0.001` and `P_MAX = 0.999` USDG. Convert to ticks once per pool at creation and store them; mind the token order, since the bound flips when `OUTCOME_i` is `currency1`.
 
