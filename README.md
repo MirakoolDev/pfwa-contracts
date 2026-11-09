@@ -23,6 +23,7 @@ cd pfwa-contracts/orderbook
 forge test                       # 41 passed, 2 skipped (the fork tests, below)
 ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com   forge test --match-path test/OrderBookFork.t.sol   # 1 passed: a market's whole life on a copy of Robinhood Chain
 ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com   forge test --match-path test/LiquidityLockerFork.t.sol   # 1 passed: the deployed factory, seeded and locked, released after trading
+ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com   forge test --match-path test/OBSetRouterFork.t.sol      # 3 passed: buying through full sets on live market 200000 moves both prices and gets more than a plain buy
 cd intents && npm install && npm test   # 9 passed: the NEAR Intents flow
 node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana address>   --user 0xYourRobinhoodAddress --market 200000 --outcome 0 --dry   # a live 1Click price, nothing spent
 ```
@@ -35,7 +36,7 @@ node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana 
 |---|---|
 | **Built during the hackathon** | `orderbook/` and `docs/`. Full diff since the last pre-hackathon commit: [8f4ff32...main](https://github.com/MirakoolDev/pfwa-contracts/compare/8f4ff32...main) |
 | **Existed before** | Everything outside `orderbook/` and `docs/`: the bonding curve contracts in `src/`, live on Robinhood Chain since July 31, 2026 |
-| **Contracts** | `OBMarketFactory`, `OBMarket`, `OutcomeToken`, `PFWAMarketHook` (Uniswap v4), `PFWALimitOrders`, `MarketResolver`, `FeeCollector`, `IntentForwarder` + `ForwarderFactory`, `LiquidityLocker` + `LiquidityLockerFactory`. What each does: [`orderbook/README.md`](orderbook/README.md) |
+| **Contracts** | `OBMarketFactory`, `OBMarket`, `OutcomeToken`, `PFWAMarketHook` (Uniswap v4), `PFWALimitOrders`, `MarketResolver`, `FeeCollector`, `IntentForwarder` + `ForwarderFactory`, `LiquidityLocker` + `LiquidityLockerFactory`, `OBSetRouter` + `OBSetRouterFactory`. What each does: [`orderbook/README.md`](orderbook/README.md) |
 | **NEAR integration** | [`orderbook/intents/`](orderbook/intents/README.md): pay with SOL, BTC, USDC on Base or any asset NEAR Intents supports, receive outcome tokens on Robinhood Chain through the 1Click API and our `ForwarderFactory`. Each order gets its own CREATE2 deposit address, so no database or custodian holds funds; the keeper can only buy for the trader or refund them. Winnings go back the same way |
 | **App** | pfwa.fun's create page, market page (chart, trades, limit orders, sets, liquidity, disputes, redeem) and a Pay from any chain panel, run end to end on a local copy of Robinhood Chain. The app's code is private; it calls only the contracts here |
 | **Track** | Unstoppable DeFi: a market with no custodian, settled across chains through NEAR Intents |
@@ -56,6 +57,8 @@ node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana 
 | `ForwarderFactory` (NEAR Intents) | [`0xD95560b028F61eB5a28379bC5588DE315f2CcA38`](https://robinhoodchain.blockscout.com/address/0xD95560b028F61eB5a28379bC5588DE315f2CcA38) | [Sourcify](https://repo.sourcify.dev/4663/0xD95560b028F61eB5a28379bC5588DE315f2CcA38) |
 | `LiquidityLocker` | [`0x5Bfc103f5b7d55c04BADb2F170b01dbCBc74aeca`](https://robinhoodchain.blockscout.com/address/0x5Bfc103f5b7d55c04BADb2F170b01dbCBc74aeca) | [Sourcify](https://repo.sourcify.dev/4663/0x5Bfc103f5b7d55c04BADb2F170b01dbCBc74aeca) |
 | `LiquidityLockerFactory` | [`0x29823d36a74Fc163Bd07fF29F59E0579c675Ff96`](https://robinhoodchain.blockscout.com/address/0x29823d36a74Fc163Bd07fF29F59E0579c675Ff96) | [Sourcify](https://repo.sourcify.dev/4663/0x29823d36a74Fc163Bd07fF29F59E0579c675Ff96) |
+| `OBSetRouter` | [`0x3f4aCb32c0141ff189C3e44c6a9333905F55Dd2F`](https://robinhoodchain.blockscout.com/address/0x3f4aCb32c0141ff189C3e44c6a9333905F55Dd2F) | [Sourcify](https://repo.sourcify.dev/4663/0x3f4aCb32c0141ff189C3e44c6a9333905F55Dd2F) |
+| `OBSetRouterFactory` | [`0x5135c6B5e7efB468C31c9Bcb506A522d20B90c6e`](https://robinhoodchain.blockscout.com/address/0x5135c6B5e7efB468C31c9Bcb506A522d20B90c6e) | [Sourcify](https://repo.sourcify.dev/4663/0x5135c6B5e7efB468C31c9Bcb506A522d20B90c6e) |
 
 
 ## How it works (bonding curve markets)
