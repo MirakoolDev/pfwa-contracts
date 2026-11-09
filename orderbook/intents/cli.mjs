@@ -23,7 +23,7 @@ const HELP = `pfwa-intents: buy PFWA order book outcomes from any chain through 
   withdraw --to <assetId> --amount <usdg>   Send USDG from Robinhood Chain to another chain
       --recipient <address on that chain> --refund-to <0x address> [--dry]
 
-Environment: OB_FACTORY, OB_FORWARDER (the deployed order book contracts), ROBINHOOD_RPC_URL,
+Environment: OB_FACTORY, OB_FORWARDER (default: the order book contracts on Robinhood Chain mainnet), ROBINHOOD_RPC_URL,
 ONECLICK_API_KEY (optional partner key), KEEPER_PRIVATE_KEY (keeper only), INTENTS_STORE (default orders.json).
 `;
 
@@ -52,7 +52,8 @@ async function main() {
   const opts = args(process.argv.slice(2));
   const cmd = opts._[0] ?? 'help';
   const oneclick = createOneClick();
-  const config = { factory: process.env.OB_FACTORY, forwarder: process.env.OB_FORWARDER, quoter: process.env.V4_QUOTER || V4_QUOTER };
+  // Defaults: the contracts live on Robinhood Chain mainnet since Nov 9, 2026.
+  const config = { factory: process.env.OB_FACTORY || '0x06703aE0f85Ad14846CB5EeBCeBFc85b1cebB6F7', forwarder: process.env.OB_FORWARDER || '0xD95560b028F61eB5a28379bC5588DE315f2CcA38', quoter: process.env.V4_QUOTER || V4_QUOTER };
 
   if (cmd === 'help') return console.log(HELP);
 

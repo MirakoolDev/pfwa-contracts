@@ -42,7 +42,17 @@ node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana 
 ### Launch settings and status
 
 - **Settings (confirmed Nov 8):** 1% protocol fee (at most 2%), creator fee 0 to 1%, 1 USDG to create a market, 50 USDG dispute bond, 2-hour dispute window, at most 1,000 USDG per market until audited. Fees buy back $PFWA hourly through Uniswap V3 (USDG → WETH → the $PFWA Pons pool) and the $PFWA is held in the treasury. Every address: [`orderbook/README.md`](orderbook/README.md#launch-settings).
-- **Mainnet:** next. Addresses and Sourcify verification links will be listed here once deployed.
+- **Live on Robinhood Chain mainnet (Nov 9, 2026, from block 110,039,733), every contract verified on Sourcify:**
+
+| Contract | Address | Source |
+|---|---|---|
+| `OBMarketFactory` | [`0x06703aE0f85Ad14846CB5EeBCeBFc85b1cebB6F7`](https://robinhoodchain.blockscout.com/address/0x06703aE0f85Ad14846CB5EeBCeBFc85b1cebB6F7) | [Sourcify](https://repo.sourcify.dev/4663/0x06703aE0f85Ad14846CB5EeBCeBFc85b1cebB6F7) |
+| `PFWAMarketHook` | [`0x2a4C4B54b096746Bdc328969dB02de7Cbca4A0Cc`](https://robinhoodchain.blockscout.com/address/0x2a4C4B54b096746Bdc328969dB02de7Cbca4A0Cc) | [Sourcify](https://repo.sourcify.dev/4663/0x2a4C4B54b096746Bdc328969dB02de7Cbca4A0Cc) |
+| `PFWALimitOrders` | [`0x6e7E0265a6B8080E0b5233cF186818FC1Be22C2A`](https://robinhoodchain.blockscout.com/address/0x6e7E0265a6B8080E0b5233cF186818FC1Be22C2A) | [Sourcify](https://repo.sourcify.dev/4663/0x6e7E0265a6B8080E0b5233cF186818FC1Be22C2A) |
+| `MarketResolver` | [`0x365C5301c42694478cC11b837C28449f7B5A08ae`](https://robinhoodchain.blockscout.com/address/0x365C5301c42694478cC11b837C28449f7B5A08ae) | [Sourcify](https://repo.sourcify.dev/4663/0x365C5301c42694478cC11b837C28449f7B5A08ae) |
+| `FeeCollector` | [`0xacA8702af8B8344F646e06525C354d10747B55B9`](https://robinhoodchain.blockscout.com/address/0xacA8702af8B8344F646e06525C354d10747B55B9) | [Sourcify](https://repo.sourcify.dev/4663/0xacA8702af8B8344F646e06525C354d10747B55B9) |
+| `ForwarderFactory` (NEAR Intents) | [`0xD95560b028F61eB5a28379bC5588DE315f2CcA38`](https://robinhoodchain.blockscout.com/address/0xD95560b028F61eB5a28379bC5588DE315f2CcA38) | [Sourcify](https://repo.sourcify.dev/4663/0xD95560b028F61eB5a28379bC5588DE315f2CcA38) |
+
 
 ## How it works (bonding curve markets)
 

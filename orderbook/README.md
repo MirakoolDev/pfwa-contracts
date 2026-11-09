@@ -96,6 +96,10 @@ Fixed in the contracts: protocol fee 1% (at most 2%), creator fee at most 1%, di
 **The buyback route.** Both pools are in Uniswap's V3 factory on Robinhood Chain (`0x1f7d7550b1b028f7571e69a784071f0205fd2efa`): USDG/WETH 0.01% (`0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca`) and $PFWA/WETH 1% (`0x5313a71595178721e1d58fd4cb459e4981aae441`, the Pons pool and $PFWA's deepest).
 
 
+## Deployed (Robinhood Chain, Nov 9, 2026)
+
+From block 110,039,733, verified on Sourcify. Addresses and links: [the main README](../README.md#launch-settings-and-status).
+
 ## Before mainnet
 - USDG confirmed onchain: `0x5fc5…d168` is Global Dollar, 6 decimals, and 1Click lists it on `hood`.
 - Launch deposit cap: 1,000 USDG per market (`DEPOSIT_CAP`; the owner can change it for new markets with `setDepositCap`). Decided Nov 8.
