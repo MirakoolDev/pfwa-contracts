@@ -161,7 +161,7 @@ NEAR Intents' 1Click API lists Robinhood Chain as `hood`, with ETH, WETH and USD
 - **Fees in:** protocol swap fees, creation fees and slashed-bond shares, all in USDG.
 - **`buyback(minOut)`:**
   1. Only the owner or the keeper can call it, at most once an hour. If anyone could call it, they could pass a `minOut` of 0 and sandwich the swap.
-  2. It swaps the accumulated USDG into WETH, then WETH into $PFWA, through the existing $PFWA pool route, with `minOut` from a TWAP check or a keeper quote.
+  2. It swaps the accumulated USDG into WETH, then WETH into $PFWA, through Uniswap's V3 SwapRouter02 (`0xcaf681a66d020601342297493863e78c959e5cb2`): USDG/WETH 0.01%, then the $PFWA/WETH 1% Pons pool, $PFWA's deepest. `minOut` comes from a keeper quote. The route and its liquidity are in the [orderbook README](../orderbook/README.md#launch-settings).
   3. It sends the $PFWA to `PFWA_TREASURY`.
   4. Burning versus holding is a constructor setting; the default is hold.
 - **Event:** `Buyback(usdgIn, pfwaOut)`.
@@ -215,7 +215,7 @@ Rough size: 4–5 days, the market page and the pay-from-any-chain modal being t
 3. **A fork test** against Robinhood Chain mainnet: create a market, seed it, swap through the Universal Router, resolve, dispute, arbitrate and redeem.
 4. **An end-to-end NEAR Intents test** with a small real amount: SOL or ETH from another chain in, outcome tokens out.
 
-## 12. Hackathon plan (2–14 Nov)
+## 12. Hackathon plan (2–14 Nov, submissions close Nov 14 23:59 UTC)
 
 | Days | Work | Status |
 |---|---|---|
@@ -224,8 +224,8 @@ Rough size: 4–5 days, the market page and the pay-from-any-chain modal being t
 | 6–8 | `MarketResolver` and `FeeCollector`. Fork test the full lifecycle | Done |
 | 8–9 | Limit orders (`PFWALimitOrders`) wired to the hook. `IntentForwarder`, plus the 1Click flow and keeper | Done, run end to end on a fork |
 | 9–11 | Front end (§10): create, market page, pay from any chain, disputes. Indexer and resolver bot changes | Front end done and run end to end on a local copy of Robinhood Chain (create, trade, limit orders, sets, liquidity in and out, disputes, redeem, pay from any chain with a live 1Click price). Indexer and resolver bot: to do |
-| 11–12 | Deploy to mainnet with a per-market deposit cap, once every fee, cap and bond is confirmed. End-to-end tests with small amounts | To do |
+| 11–12 | Deploy to mainnet with a per-market deposit cap, once every fee, cap and bond is confirmed. End-to-end tests with small amounts | Every setting confirmed Nov 8 (1% protocol fee, creator fee at most 1%, 1 USDG creation fee, 1,000 USDG cap per market, $PFWA held in the treasury). Buyback route checked. Mainnet deploy: to do |
 | 12–13 | Demo video, README and build log | To do |
 | 14 | Submit | To do |
 
-**Launch safety:** a per-market cap (e.g. 1,000 USDG) and a global cap until the contracts are audited.
+**Launch safety:** a 1,000 USDG cap per market until the contracts are audited. No global cap (decided Nov 8).

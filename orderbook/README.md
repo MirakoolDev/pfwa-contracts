@@ -72,12 +72,32 @@ ROBINHOOD_RPC_URL=<rpc> forge test --match-contract OrderBookForkTest
 ## Deploy
 
 ```bash
-forge script script/Deploy.s.sol --rpc-url robinhood --broadcast
+forge script script/Deploy.s.sol --rpc-url robinhood --broadcast --sender <deployer> <wallet flag>
 ```
 
-The required environment variables are listed at the top of the script. The hook's address is mined with CREATE2 so it carries its permission bits.
+The script reads no private key: the broadcasting wallet comes from the command line (`--ledger`, `--private-key`, or `--unlocked` on a fork). The required environment variables are listed at the top of the script. The hook's address is mined with CREATE2 so it carries its permission bits, skipping any address that already has code.
+
+### Launch settings
+
+| Setting | Value |
+|---|---|
+| `OWNER` | PFWA's owner wallet (owns the factory, resolver and fee collector; settles disputes), moving to a multisig |
+| `RESOLVER_BOT`, `KEEPER` | PFWA's relayer |
+| `TREASURY` | PFWA's treasury: receives the bought-back $PFWA (held, not burned) |
+| `USDG` | `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` |
+| `PFWA` | `0xa934bA4F59070149d37A93F8A002Af79BAe35563` |
+| `SWAP_ROUTER` (Uniswap V3 SwapRouter02) | `0xcaf681a66d020601342297493863e78c959e5cb2` |
+| `BUYBACK_PATH` | USDG →0.01%→ WETH →1%→ $PFWA: `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d1680000640Bd7D308f8E1639FAb988df18A8011f41EAcAD73002710a934bA4F59070149d37A93F8A002Af79BAe35563` |
+| `CREATION_FEE` | `1000000` (1 USDG) |
+| `DEPOSIT_CAP` | `1000000000` (1,000 USDG per market; no global cap) |
+
+Fixed in the contracts: protocol fee 1% (at most 2%), creator fee at most 1%, dispute bond 50 USDG, dispute window 2 hours.
+
+**The buyback route.** Both pools are in Uniswap's V3 factory on Robinhood Chain (`0x1f7d7550b1b028f7571e69a784071f0205fd2efa`): USDG/WETH 0.01% (`0x52e65b17fb6e5ba00ed806f37afcd2daa50271ca`) and $PFWA/WETH 1% (`0x5313a71595178721e1d58fd4cb459e4981aae441`, the Pons pool and $PFWA's deepest).
+
 
 ## Before mainnet
 - USDG confirmed onchain: `0x5fc5…d168` is Global Dollar, 6 decimals, and 1Click lists it on `hood`.
-- Set the launch deposit cap: `DEPOSIT_CAP` in the deploy script (per market; the owner can change it for new markets with `setDepositCap`).
+- Launch deposit cap: 1,000 USDG per market (`DEPOSIT_CAP`; the owner can change it for new markets with `setDepositCap`). Decided Nov 8.
+- Buyback route checked for liquidity (above).
 - Get an audit.

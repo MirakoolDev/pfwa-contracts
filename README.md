@@ -9,13 +9,40 @@ Every market, trade, resolution and payout on pfwa.fun goes through these contra
 
 ## Order book markets (new, built for the NEAR Hackathon, Nov 1–14 2026)
 
-A second market engine, in [`orderbook/`](orderbook/): each outcome is a token backed 1:1 by USDG and trades in its own Uniswap v4 pool through one PFWA hook, with limit orders, the same data-source resolution as the bonding curve markets plus a 2-hour dispute window, and buying from any chain through NEAR Intents. Product and technical docs: [`docs/prd-order-book-markets.md`](docs/prd-order-book-markets.md), [`docs/spec-order-book-markets.md`](docs/spec-order-book-markets.md).
+A second market engine, in [`orderbook/`](orderbook/). Each outcome is a token backed 1:1 by USDG, so its price is the market's chance (0.62 = 62%) and a winning token pays exactly 1 USDG. Each outcome trades in its own Uniswap v4 pool, all run by one PFWA hook. Markets have limit orders, store their rules onchain, resolve from the same data sources as the bonding curve markets plus a 2-hour dispute window, and can be bought into from any chain through NEAR Intents.
 
-- **What existed before the hackathon:** everything outside `orderbook/` and `docs/`: the bonding curve contracts in `src/`, live on Robinhood Chain since July 31, 2026.
-- **What was built during it:** `orderbook/` and `docs/`. The full diff since the last pre-hackathon commit: [8f4ff32...main](https://github.com/MirakoolDev/pfwa-contracts/compare/8f4ff32...main).
-- **The NEAR integration:** [`orderbook/intents/`](orderbook/intents/README.md). A trader pays with an asset on any chain NEAR Intents supports (SOL, USDC on Base, BTC, …) and receives outcome tokens on Robinhood Chain, through the 1Click API and our `ForwarderFactory`. Winnings go back the same way. Try it: `cd orderbook/intents && npm install && node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana address> --user <0x…> --market 200000 --outcome 0 --dry`, or run the whole flow on a fork with `bash e2e/fork.sh`.
-- **Status (Nov 2):** contracts and the NEAR Intents flow built and tested; not deployed yet; the app's front end is next ([spec §10](docs/spec-order-book-markets.md)).
-- **Build and test:** `git submodule update --init --recursive`, then `cd orderbook && forge test` (contracts, see [`orderbook/README.md`](orderbook/README.md)) and `cd orderbook/intents && npm test` (the NEAR Intents flow).
+Product and technical docs: [`docs/prd-order-book-markets.md`](docs/prd-order-book-markets.md), [`docs/spec-order-book-markets.md`](docs/spec-order-book-markets.md).
+
+### For judges: what to run and what you should see
+
+Needs [Foundry](https://getfoundry.sh) and Node 20+.
+
+```bash
+git clone --recurse-submodules https://github.com/MirakoolDev/pfwa-contracts
+cd pfwa-contracts/orderbook
+forge test                       # 41 passed, 1 skipped (the fork test, below)
+ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com   forge test --match-path test/OrderBookFork.t.sol   # 1 passed: a market's whole life on a copy of Robinhood Chain
+cd intents && npm install && npm test   # 9 passed: the NEAR Intents flow
+node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana address>   --user 0xYourRobinhoodAddress --market 200000 --outcome 0 --dry   # a live 1Click price, nothing spent
+```
+
+`bash e2e/fork.sh` (in `orderbook/intents`) runs the whole cross-chain buy on a local copy of Robinhood Chain with a live 1Click price. Our run: 0.1 SOL → 9.03 USDG delivered → 14.66 YES tokens in the buyer's wallet.
+
+### What was built, and what existed before
+
+| | |
+|---|---|
+| **Built during the hackathon** | `orderbook/` and `docs/`. Full diff since the last pre-hackathon commit: [8f4ff32...main](https://github.com/MirakoolDev/pfwa-contracts/compare/8f4ff32...main) |
+| **Existed before** | Everything outside `orderbook/` and `docs/`: the bonding curve contracts in `src/`, live on Robinhood Chain since July 31, 2026 |
+| **Contracts** | `OBMarketFactory`, `OBMarket`, `OutcomeToken`, `PFWAMarketHook` (Uniswap v4), `PFWALimitOrders`, `MarketResolver`, `FeeCollector`, `IntentForwarder` + `ForwarderFactory`. What each does: [`orderbook/README.md`](orderbook/README.md) |
+| **NEAR integration** | [`orderbook/intents/`](orderbook/intents/README.md): pay with SOL, BTC, USDC on Base or any asset NEAR Intents supports, receive outcome tokens on Robinhood Chain through the 1Click API and our `ForwarderFactory`. Each order gets its own CREATE2 deposit address, so no database or custodian holds funds; the keeper can only buy for the trader or refund them. Winnings go back the same way |
+| **App** | pfwa.fun's create page, market page (chart, trades, limit orders, sets, liquidity, disputes, redeem) and a Pay from any chain panel, run end to end on a local copy of Robinhood Chain. The app's code is private; it calls only the contracts here |
+| **Track** | Unstoppable DeFi: a market with no custodian, settled across chains through NEAR Intents |
+
+### Launch settings and status
+
+- **Settings (confirmed Nov 8):** 1% protocol fee (at most 2%), creator fee 0 to 1%, 1 USDG to create a market, 50 USDG dispute bond, 2-hour dispute window, at most 1,000 USDG per market until audited. Fees buy back $PFWA hourly through Uniswap V3 (USDG → WETH → the $PFWA Pons pool) and the $PFWA is held in the treasury. Every address: [`orderbook/README.md`](orderbook/README.md#launch-settings).
+- **Mainnet:** next. Addresses and Sourcify verification links will be listed here once deployed.
 
 ## How it works (bonding curve markets)
 
