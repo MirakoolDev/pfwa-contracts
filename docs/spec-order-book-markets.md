@@ -70,7 +70,7 @@ function redeem(uint256 amount, address to) external;     // after resolution: b
 For each outcome `i`:
 - **Pool key:** `{currency0, currency1} = sort(OUTCOME_i, USDG)`, `fee = 0` (the hook charges the fee), `tickSpacing = 10`, `hooks = PFWAMarketHook`.
 - **Initial price:** set from the creator's opening probability. The default is an even 1/N.
-- **Seeding:** the creator can provide liquidity by minting complete sets and adding concentrated liquidity between the price bounds. The front end does this after creation (`mintSet`, then one PositionManager position per pool across the bounds), and takes it out again the same way; there is no `createAndSeed` in the factory.
+- **Seeding (creator liquidity):** the creator is the market's liquidity provider and is paid by the creator fee (pools charge no LP fee). On pfwa.fun the creator must add at least 100 USDG right after creating the market, through `LiquidityLocker.seed`: one call mints complete sets and opens one PositionManager position per pool, from 20 points under to 20 points over the opening chance, with the NFTs held by the locker. They can't be taken out while `OBMarket.tradingOpen()` is true; after that `release` returns them to the creator, who withdraws as usual. The 100 USDG minimum is an app rule (the site lists and resolves only markets that meet it); the lock is enforced by the contract. Anyone else can still add liquidity directly through the PositionManager, unlocked and unpaid.
 
 **Price bounds:** each outcome must trade between `P_MIN = 0.001` and `P_MAX = 0.999` USDG. Convert to ticks once per pool at creation and store them; mind the token order, since the bound flips when `OUTCOME_i` is `currency1`.
 

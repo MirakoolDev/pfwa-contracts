@@ -81,7 +81,7 @@ Market templates, data sources, the setup fingerprint, the resolver bot's data c
 **Create**
 1. The creator picks a template, as today.
 2. They choose an engine: bonding curve or order book.
-3. For an order book market, they set the opening price per outcome (default: even) and optionally seed liquidity in USDG.
+3. For an order book market, they set the opening price per outcome (default: even) and add at least 100 USDG of liquidity, locked until trading stops. They earn the creator fee on every trade.
 4. They pay the creation fee, and the factory deploys the market, its outcome tokens and pools.
 
 **Trade**
@@ -108,7 +108,7 @@ Market templates, data sources, the setup fingerprint, the resolver bot's data c
 
 ## Risks
 
-- **Empty markets.** A new order book market has no liquidity until someone provides it. Mitigation: creator seeding, the MM agent and (later) the funding phase.
+- **Empty markets.** A new order book market has no liquidity until someone provides it. Mitigation: the creator must seed at least 100 USDG, locked while the market trades (decided Nov 9); later, the MM agent and a funding phase.
 - **Contract risk.** New contracts holding user funds. Mitigation: tests, a capped deposit size for the hackathon launch, and an audit before lifting the cap.
 - **Admin trust.** The arbitration multisig and the factory owner (who sets the fee and bond for new markets and the deposit cap, and can pause new market creation) are trust points. Live markets can't be paused and their fees can't be changed. Document them clearly, and move arbitration to $PFWA holders later.
 - **Regulation.** Dollar-denominated outcome tokens look more like regulated event contracts than ETH bets do. Keep the existing region restrictions and terms.

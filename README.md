@@ -9,7 +9,7 @@ Every market, trade, resolution and payout on pfwa.fun goes through these contra
 
 ## Order book markets (new, built for the NEAR Hackathon, Nov 1–14 2026)
 
-A second market engine, in [`orderbook/`](orderbook/). Each outcome is a token backed 1:1 by USDG, so its price is the market's chance (0.62 = 62%) and a winning token pays exactly 1 USDG. Each outcome trades in its own Uniswap v4 pool, all run by one PFWA hook. Markets have limit orders, store their rules onchain, resolve from the same data sources as the bonding curve markets plus a 2-hour dispute window, and can be bought into from any chain through NEAR Intents.
+A second market engine, in [`orderbook/`](orderbook/). Each outcome is a token backed 1:1 by USDG, so its price is the market's chance (0.62 = 62%) and a winning token pays exactly 1 USDG. Each outcome trades in its own Uniswap v4 pool, all run by one PFWA hook. Markets have limit orders, store their rules onchain, resolve from the same data sources as the bonding curve markets plus a 2-hour dispute window, and can be bought into from any chain through NEAR Intents. The creator opens each market with its liquidity, which a `LiquidityLocker` holds until trading stops.
 
 Product and technical docs: [`docs/prd-order-book-markets.md`](docs/prd-order-book-markets.md), [`docs/spec-order-book-markets.md`](docs/spec-order-book-markets.md).
 
@@ -20,8 +20,9 @@ Needs [Foundry](https://getfoundry.sh) and Node 20+.
 ```bash
 git clone --recurse-submodules https://github.com/MirakoolDev/pfwa-contracts
 cd pfwa-contracts/orderbook
-forge test                       # 41 passed, 1 skipped (the fork test, below)
+forge test                       # 41 passed, 2 skipped (the fork tests, below)
 ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com   forge test --match-path test/OrderBookFork.t.sol   # 1 passed: a market's whole life on a copy of Robinhood Chain
+ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com   forge test --match-path test/LiquidityLockerFork.t.sol   # 1 passed: the deployed factory, seeded and locked, released after trading
 cd intents && npm install && npm test   # 9 passed: the NEAR Intents flow
 node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana address>   --user 0xYourRobinhoodAddress --market 200000 --outcome 0 --dry   # a live 1Click price, nothing spent
 ```
@@ -34,13 +35,14 @@ node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana 
 |---|---|
 | **Built during the hackathon** | `orderbook/` and `docs/`. Full diff since the last pre-hackathon commit: [8f4ff32...main](https://github.com/MirakoolDev/pfwa-contracts/compare/8f4ff32...main) |
 | **Existed before** | Everything outside `orderbook/` and `docs/`: the bonding curve contracts in `src/`, live on Robinhood Chain since July 31, 2026 |
-| **Contracts** | `OBMarketFactory`, `OBMarket`, `OutcomeToken`, `PFWAMarketHook` (Uniswap v4), `PFWALimitOrders`, `MarketResolver`, `FeeCollector`, `IntentForwarder` + `ForwarderFactory`. What each does: [`orderbook/README.md`](orderbook/README.md) |
+| **Contracts** | `OBMarketFactory`, `OBMarket`, `OutcomeToken`, `PFWAMarketHook` (Uniswap v4), `PFWALimitOrders`, `MarketResolver`, `FeeCollector`, `IntentForwarder` + `ForwarderFactory`, `LiquidityLocker` + `LiquidityLockerFactory`. What each does: [`orderbook/README.md`](orderbook/README.md) |
 | **NEAR integration** | [`orderbook/intents/`](orderbook/intents/README.md): pay with SOL, BTC, USDC on Base or any asset NEAR Intents supports, receive outcome tokens on Robinhood Chain through the 1Click API and our `ForwarderFactory`. Each order gets its own CREATE2 deposit address, so no database or custodian holds funds; the keeper can only buy for the trader or refund them. Winnings go back the same way |
 | **App** | pfwa.fun's create page, market page (chart, trades, limit orders, sets, liquidity, disputes, redeem) and a Pay from any chain panel, run end to end on a local copy of Robinhood Chain. The app's code is private; it calls only the contracts here |
 | **Track** | Unstoppable DeFi: a market with no custodian, settled across chains through NEAR Intents |
 
 ### Launch settings and status
 
+- **Creator liquidity (Nov 9):** a market on pfwa.fun opens with at least 100 USDG of the creator's liquidity, placed 20 points either side of each outcome's opening chance and locked in the `LiquidityLocker` until trading stops. The creator earns the creator fee on every trade. The 100 USDG minimum is pfwa.fun's rule; the lock is the contract's.
 - **Settings (confirmed Nov 8):** 1% protocol fee (at most 2%), creator fee 0 to 1%, 1 USDG to create a market, 50 USDG dispute bond, 2-hour dispute window, at most 1,000 USDG per market until audited. Fees buy back $PFWA hourly through Uniswap V3 (USDG → WETH → the $PFWA Pons pool) and the $PFWA is held in the treasury. Every address: [`orderbook/README.md`](orderbook/README.md#launch-settings).
 - **Live on Robinhood Chain mainnet (Nov 9, 2026, from block 110,039,733), every contract verified on Sourcify:**
 
@@ -52,6 +54,8 @@ node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana 
 | `MarketResolver` | [`0x365C5301c42694478cC11b837C28449f7B5A08ae`](https://robinhoodchain.blockscout.com/address/0x365C5301c42694478cC11b837C28449f7B5A08ae) | [Sourcify](https://repo.sourcify.dev/4663/0x365C5301c42694478cC11b837C28449f7B5A08ae) |
 | `FeeCollector` | [`0xacA8702af8B8344F646e06525C354d10747B55B9`](https://robinhoodchain.blockscout.com/address/0xacA8702af8B8344F646e06525C354d10747B55B9) | [Sourcify](https://repo.sourcify.dev/4663/0xacA8702af8B8344F646e06525C354d10747B55B9) |
 | `ForwarderFactory` (NEAR Intents) | [`0xD95560b028F61eB5a28379bC5588DE315f2CcA38`](https://robinhoodchain.blockscout.com/address/0xD95560b028F61eB5a28379bC5588DE315f2CcA38) | [Sourcify](https://repo.sourcify.dev/4663/0xD95560b028F61eB5a28379bC5588DE315f2CcA38) |
+| `LiquidityLocker` | [`0x5Bfc103f5b7d55c04BADb2F170b01dbCBc74aeca`](https://robinhoodchain.blockscout.com/address/0x5Bfc103f5b7d55c04BADb2F170b01dbCBc74aeca) | [Sourcify](https://repo.sourcify.dev/4663/0x5Bfc103f5b7d55c04BADb2F170b01dbCBc74aeca) |
+| `LiquidityLockerFactory` | [`0x29823d36a74Fc163Bd07fF29F59E0579c675Ff96`](https://robinhoodchain.blockscout.com/address/0x29823d36a74Fc163Bd07fF29F59E0579c675Ff96) | [Sourcify](https://repo.sourcify.dev/4663/0x29823d36a74Fc163Bd07fF29F59E0579c675Ff96) |
 
 
 ## How it works (bonding curve markets)

@@ -15,10 +15,13 @@ Contracts for PFWA's second market engine. Each outcome is a token backed 1:1 by
 | `src/PFWALimitOrders.sol` | `PFWALimitOrders` | Limit orders. An order is one-sided liquidity in one price step on the far side of the price; when a swap moves the price fully through it, it has filled. Orders at the same step share one position. Filled in the swap that crosses them (up to 8 a swap), or later by anyone with `fill`. Cancel any time, withdraw once filled. No owner, no fee. |
 | `src/IntentForwarder.sol` | `ForwarderFactory`, `IntentDeposit` | NEAR Intents entry. Each cross-chain order gets a deterministic deposit address. Once USDG lands there, `execute` buys the outcome for the user (respecting `minOut`, and stopping at the price bound with the rest returned), and `refund` returns the USDG. The off-chain side (1Click quotes, the keeper, a CLI and an end-to-end fork run) is in [`intents/`](intents/README.md). |
 
+| `src/LiquidityLocker.sol` | `LiquidityLocker`, `LiquidityLockerFactory` | Creator liquidity, locked while the market trades. `seed` takes USDG, mints complete sets and opens a Uniswap v4 position in each of the market's pools in one call, with the position NFTs minted to the locker. Nobody can take them out while `tradingOpen` is true, the seeder included. Once trading stops (a result is posted, or end of trading passes), `release` sends the NFTs back to the seeder. Rounding leftovers go straight back. The factory deploys a locker for any market factory. |
+
 ### Choices to know about
 - **No admin pausing.** Trading closes at the market's end of trading, or as soon as a result is posted (a data source can settle a market early, as on bonding curve markets), and never reopens. No admin can pause a market or change a live market's fees or bounds.
 - **Fees are pulled, not pushed.** USDG can freeze addresses, so paying fees inside a swap would let a frozen creator address block a market. Creators call `claimCreatorFees` instead.
 - **Exact-input swaps only.** That keeps the fee logic simple, and the Universal Router supports it.
+- **Creators are the liquidity providers.** Pools charge no LP fee; the creator earns the creator fee on every trade, and their liquidity is locked in `LiquidityLocker` while the market trades. pfwa.fun requires at least 100 USDG of it, placed 20 points either side of each opening chance.
 - **Limit orders are our own** (`PFWALimitOrders`): the hook reports every swap's price move to it, and it fills the price steps the swap crossed.
 
 ## Setup
@@ -65,7 +68,9 @@ npm install && npm test   # Hardhat 3 (Solidity tests)
 ROBINHOOD_RPC_URL=<rpc> forge test --match-contract OrderBookForkTest
 ```
 
-41 tests, all passing (40 local, 1 fork).
+`test/LiquidityLockerFork.t.sol` runs against the deployed `OBMarketFactory`, Uniswap's PositionManager and Permit2 on a fork: create a market, seed both pools through the locker, check the positions can't come out while trading is open (not even by the seeder), that a closed market can't be seeded, and that after trading anyone can release the positions to the seeder and only to them.
+
+43 tests, all passing (41 local, 2 fork).
 
 **Price bounds and routers:** a swap that would push an outcome past 0.001 or 0.999 USDG reverts. Front ends and the forwarder should set `sqrtPriceLimitX96` at the pool's bound so a big order stops there instead of failing.
 
@@ -75,7 +80,13 @@ ROBINHOOD_RPC_URL=<rpc> forge test --match-contract OrderBookForkTest
 forge script script/Deploy.s.sol --rpc-url robinhood --broadcast --sender <deployer> <wallet flag>
 ```
 
-The script reads no private key: the broadcasting wallet comes from the command line (`--ledger`, `--private-key`, or `--unlocked` on a fork). The required environment variables are listed at the top of the script. The hook's address is mined with CREATE2 so it carries its permission bits, skipping any address that already has code.
+The liquidity locker deploys separately (`MARKET_FACTORY`, `POSITION_MANAGER`, `PERMIT2`):
+
+```bash
+forge script script/DeployLocker.s.sol --rpc-url robinhood --broadcast --sender <deployer> <wallet flag>
+```
+
+The scripts read no private key: the broadcasting wallet comes from the command line (`--ledger`, `--private-key`, or `--unlocked` on a fork). The required environment variables are listed at the top of the script. The hook's address is mined with CREATE2 so it carries its permission bits, skipping any address that already has code.
 
 ### Launch settings
 
@@ -98,10 +109,10 @@ Fixed in the contracts: protocol fee 1% (at most 2%), creator fee at most 1%, di
 
 ## Deployed (Robinhood Chain, Nov 9, 2026)
 
-From block 110,039,733, verified on Sourcify. Addresses and links: [the main README](../README.md#launch-settings-and-status).
+From block 110,039,733, verified on Sourcify. The `LiquidityLocker` and its factory followed the same day. Addresses and links: [the main README](../README.md#launch-settings-and-status).
 
 ## Before mainnet
-- USDG confirmed onchain: `0x5fc5…d168` is Global Dollar, 6 decimals, and 1Click lists it on `hood`.
+- USDG confirmed onchain: `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` is Global Dollar, 6 decimals, and 1Click lists it on `hood`.
 - Launch deposit cap: 1,000 USDG per market (`DEPOSIT_CAP`; the owner can change it for new markets with `setDepositCap`). Decided Nov 8.
 - Buyback route checked for liquidity (above).
 - Get an audit.
