@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Fonts ── */
+  --font-sans: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-mono: var(--font-mono), "Courier New", monospace;
+  --font-heading: var(--font-space-grotesk), system-ui, sans-serif;
+
+  /* ── Brand Colors ── */
+  --color-primary:    #000000;
+  --color-secondary:  #ffffff;
+  --color-accent:     #00ff87;        /* PFWA green accent */
+  --color-accent-dim: #00cc6a;
+
+  /* ── Light mode ── */
+  --color-bg:         #ffffff;
+  --color-surface:    #f5f5f5;
+  --color-border:     #e5e5e5;
+  --color-text:       #0a0a0a;
+  --color-muted:      #737373;
+
+  /* ── Dark mode ── */
+  --color-dark-bg:      #0a0a0a;
+  --color-dark-surface: #141414;
+  --color-dark-border:  #262626;
+  --color-dark-text:    #fafafa;
+  --color-dark-muted:   #737373;
+
+  /* ── Semantic ── */
+  --color-positive: #00ff87;
+  --color-negative: #ff4444;
+
+  /* ── Remove all border-radius globally ── */
+  --radius: 0px;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  /* Remove rounded corners everywhere in our app EXCEPT the RainbowKit modal */
+  *:not([data-rk]):not([data-rk] *) {
+    border-radius: 0 !important;
+  }
+
+  /* The ConnectButton we render ourselves (not inside [data-rk]) is already covered above.
+     Only the floating modal/overlay uses [data-rk], so it keeps its natural radius. */
+
+  html {
+    font-family: var(--font-mono), "Courier New", monospace;
+    font-feature-settings: "ss01", "ss02";
+  }
+
+  body {
+    background-color: #ffffff;
+    color: #0a0a0a;
+    font-family: var(--font-mono), "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .dark body {
+    background-color: #0a0a0a;
+    color: #fafafa;
+  }
+
+  h1, h2, h3, h4, h5, h6,
+  .font-heading {
+    font-family: var(--font-space-grotesk), system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  /* Sharp inputs */
+  input, textarea, select, button {
+    border-radius: 0 !important;
+    outline: none;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    outline: 1px solid #0a0a0a;
+  }
+
+  .dark input:focus, .dark textarea:focus, .dark select:focus {
+    outline: 1px solid #fafafa;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d4d4d4; }
+  .dark ::-webkit-scrollbar-thumb { background: #404040; }
+}
+
+/* ── Global Utility Classes ── */
+@layer utilities {
+  .font-heading {
+    font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  }
+
+  .bg-surface {
+    background-color: #f5f5f5;
+  }
+  .dark .bg-surface {
+    background-color: #141414;
+  }
+
+  .border-default {
+    border-color: #e5e5e5;
+  }
+  .dark .border-default {
+    border-color: #262626;
+  }
+
+  .text-muted {
+    color: #737373;
+  }
+
+  /* Accent glow for active items */
+  .accent-underline {
+    border-bottom: 2px solid #00ff87;
+  }
+
+  @keyframes toast-slide-in {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-toast-slide {
+    animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+/* Hide scrollbar but allow scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

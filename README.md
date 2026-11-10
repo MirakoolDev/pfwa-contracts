@@ -30,15 +30,23 @@ node cli.mjs buy --from nep141:sol.omft.near --amount 0.1 --refund-to <a Solana 
 
 `bash e2e/fork.sh` (in `orderbook/intents`) runs the whole cross-chain buy on a local copy of Robinhood Chain with a live 1Click price. Our run: 0.1 SOL → 9.03 USDG delivered → 14.66 YES tokens in the buyer's wallet.
 
+**The app, run locally.** [`frontend/`](frontend/README.md) is pfwa.fun's order book app on its own: it reads the live contracts, needs no database and no keys.
+
+```bash
+cd frontend && npm ci && npm run build && npm start   # http://localhost:3000
+```
+
+Open market 200000 (SPX) to see the chart, trade history, order book, oracle data and the Pay from any chain panel. Connect a wallet on Robinhood Chain to trade, place limit orders, mint sets or create a market with real USDG; or run it against a local fork with a test wallet ([`frontend/README.md`](frontend/README.md#on-a-local-fork)). It's also live at [pfwa.fun/book](https://pfwa.fun/book).
+
 ### What was built, and what existed before
 
 | | |
 |---|---|
-| **Built during the hackathon** | `orderbook/` and `docs/`. Full diff since the last pre-hackathon commit: [8f4ff32...main](https://github.com/MirakoolDev/pfwa-contracts/compare/8f4ff32...main) |
-| **Existed before** | Everything outside `orderbook/` and `docs/`: the bonding curve contracts in `src/`, live on Robinhood Chain since July 31, 2026 |
+| **Built during the hackathon** | `orderbook/`, `frontend/` and `docs/`. Full diff since the last pre-hackathon commit: [8f4ff32...main](https://github.com/MirakoolDev/pfwa-contracts/compare/8f4ff32...main) |
+| **Existed before** | Everything outside `orderbook/`, `frontend/` and `docs/`: the bonding curve contracts in `src/`, live on Robinhood Chain since July 31, 2026 |
 | **Contracts** | `OBMarketFactory`, `OBMarket`, `OutcomeToken`, `PFWAMarketHook` (Uniswap v4), `PFWALimitOrders`, `MarketResolver`, `FeeCollector`, `IntentForwarder` + `ForwarderFactory`, `LiquidityLocker` + `LiquidityLockerFactory`, `OBSetRouter` + `OBSetRouterFactory`. What each does: [`orderbook/README.md`](orderbook/README.md) |
 | **NEAR integration** | [`orderbook/intents/`](orderbook/intents/README.md): pay with SOL, BTC, USDC on Base or any asset NEAR Intents supports, receive outcome tokens on Robinhood Chain through the 1Click API and our `ForwarderFactory`. Each order gets its own CREATE2 deposit address, so no database or custodian holds funds; the keeper can only buy for the trader or refund them. Winnings go back the same way |
-| **App** | pfwa.fun's create page, market page (chart, trades, limit orders, sets, liquidity, disputes, redeem) and a Pay from any chain panel, run end to end on a local copy of Robinhood Chain. The app's code is private; it calls only the contracts here |
+| **App** | [`frontend/`](frontend/README.md): the market list, create page and market page (chart, trades, holders, limit orders, buying through sets, liquidity, disputes, redeem) and the Pay from any chain panel, as a standalone Next.js app. pfwa.fun runs the same code inside its main app |
 | **Track** | Unstoppable DeFi: a market with no custodian, settled across chains through NEAR Intents |
 
 ### Launch settings and status
