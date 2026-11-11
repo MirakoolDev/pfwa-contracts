@@ -10,7 +10,6 @@ import { OB, UNIVERSAL_ROUTER, USDG, V4_QUOTER } from "@/lib/orderbook/config";
 import { obLimitOrdersAbi, universalRouterAbi, v4QuoterAbi } from "@/lib/orderbook/abi";
 import { encodeV4Swap } from "@/lib/orderbook/swap";
 import { bestSplit, obSetRouterAbi } from "@/lib/orderbook/splitBuy";
-import { maxUint256 } from "viem";
 import { fmtAmount, fmtPrice, limitProceeds, limitStep } from "@/lib/orderbook/math";
 import type { BookMarket } from "@/lib/orderbook/read";
 import type { BookUser } from "@/hooks/useBook";
@@ -20,6 +19,9 @@ import { approveStep, permit2Steps, useTxFlow, type FlowStep } from "./useTxFlow
 const SLIPPAGE_BPS = BigInt(100); // 1%
 
 export type LimitPick = { side: "buy" | "sell"; price: number } | null;
+
+/** The buy router's USDG allowance, at least (USDG has 6 decimals). */
+const ROUTER_ALLOWANCE = BigInt(10_000) * BigInt(1_000_000);
 
 export default function TradePanel({
   market, outcomeIndex, onOutcome, user, pick, onDone,
@@ -42,6 +44,9 @@ export default function TradePanel({
   const [amount, setAmount] = useState("10");
   const [price, setPrice] = useState("");
   const [debounced, setDebounced] = useState(amount);
+  // How a market buy fills: "sets" lets PFWA's buy router use full sets when that gets more; "pool" buys from the
+  // outcome's pool only. The buyer picks.
+  const [route, setRoute] = useState<"sets" | "pool">("sets");
 
   const outcome = market.outcomes[outcomeIndex];
   const amountRaw = parseAmount(amount);
@@ -89,9 +94,12 @@ export default function TradePanel({
     retry: false,
     queryFn: () => bestSplit(client, market, outcome.index, debouncedRaw),
   });
-  const plan = side === "buy" && split.data && split.data.sets > BigInt(0) && split.data.tokensOut > (quote.data ?? BigInt(0)) ? split.data : null;
+  // The full-sets route, when it gets more than the pool alone; used only if the buyer keeps that route.
+  const better = side === "buy" && split.data && split.data.sets > BigInt(0) && split.data.tokensOut > (quote.data ?? BigInt(0)) ? split.data : null;
+  const plan = route === "sets" ? better : null;
   const out = plan ? plan.tokensOut : quote.data;
-  const gain = plan && plan.plainOut > BigInt(0) ? (Number(plan.tokensOut) / Number(plan.plainOut) - 1) * 100 : null;
+  const gain = better && better.plainOut > BigInt(0) ? (Number(better.tokensOut) / Number(better.plainOut) - 1) * 100 : null;
+  const others = market.outcomes.filter((o) => o.index !== outcome.index).map((o) => o.name).join(", ");
   const avgPrice = out && debouncedRaw > BigInt(0) ? (side === "buy" ? Number(debouncedRaw) / Number(out) : Number(out) / Number(debouncedRaw)) : 0;
 
   // Limit orders: the price step the order sits in.
@@ -116,9 +124,12 @@ export default function TradePanel({
     if (!address || !out) return;
     if (plan && OB.setRouter) {
       const router = OB.setRouter;
+      // A capped allowance, not unlimited (wallets warn on unlimited approvals to a new contract): 10,000 USDG, or 10x
+      // this buy when that's more, so one approval still covers almost every later buy.
+      const routerAllowance = amountRaw * BigInt(10) > ROUTER_ALLOWANCE ? amountRaw * BigInt(10) : ROUTER_ALLOWANCE;
       const minOut = (plan.tokensOut * (BigInt(10_000) - SLIPPAGE_BPS)) / BigInt(10_000);
       void start(`Buy ${outcome.name}`, [
-        approveStep(client, writeContractAsync, { token: USDG, owner: address, spender: router, amount: amountRaw, approveAmount: maxUint256, label: "Approve USDG for PFWA's buy router (once)" }),
+        approveStep(client, writeContractAsync, { token: USDG, owner: address, spender: router, amount: amountRaw, approveAmount: routerAllowance, label: `Approve ${fmtAmount(routerAllowance)} USDG for PFWA's buy router` }),
         {
           id: "split-buy",
           label: `Buy ${outcome.name} with ${fmtAmount(amountRaw)} USDG`,
@@ -241,22 +252,49 @@ export default function TradePanel({
               </div>
             )}
 
+            {mode === "market" && better && (
+              <div className="space-y-1.5">
+                <Label>How to buy</Label>
+                <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How to buy">
+                  {([
+                    ["sets", "Best price", gain !== null && gain >= 0.1 ? `${gain.toFixed(1)}% more ${outcome.name}` : "Through full sets"],
+                    ["pool", "Pool only", quote.data ? `≈ ${fmtAmount(quote.data)} ${outcome.name}` : "Can't fill this size"],
+                  ] as const).map(([k, title, sub]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      role="radio"
+                      aria-checked={route === k}
+                      onClick={() => setRoute(k)}
+                      className={`p-2 border text-left transition-colors ${
+                        route === k ? "border-black dark:border-white bg-neutral-50 dark:bg-neutral-900" : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600"
+                      }`}
+                    >
+                      <span className="block font-heading font-bold text-xs text-black dark:text-white">{title}</span>
+                      <span className="block font-mono text-[10px] text-neutral-500 tabular-nums">{sub}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="font-mono text-[10px] text-neutral-500 leading-relaxed">
+                  {route === "sets"
+                    ? `Part of your USDG makes full sets (1 USDG = one of every outcome). PFWA's router sells the ${others} back to ${others.includes(",") ? "their pools" : "its pool"} and buys more ${outcome.name} with it, in one transaction. You end up holding only ${outcome.name}.`
+                    : `Buys ${outcome.name} from its own pool, nothing else.`}
+                </p>
+              </div>
+            )}
+
             <div className="font-mono text-[11px] space-y-1.5 text-neutral-500">
               {mode === "market" ? (
                 (quote.isFetching || (side === "buy" && split.isFetching)) && !out ? (
                   <p>Pricing…</p>
                 ) : quote.isError && !plan ? (
-                  <p className="text-red-500">Not enough liquidity to fill this size. Try a smaller amount, or place a limit order.</p>
+                  <p className="text-red-500">
+                    {better ? "The pool alone can't fill this size. Use the full sets route, try a smaller amount, or place a limit order." : "Not enough liquidity to fill this size. Try a smaller amount, or place a limit order."}
+                  </p>
                 ) : out ? (
                   <>
                     <Row k="You get" v={`≈ ${fmtAmount(out)} ${side === "buy" ? outcome.name : "USDG"}`} strong />
                     <Row k="Average price" v={`${fmtPrice(avgPrice)} USDG`} />
-                    {plan && (
-                      <Row
-                        k="Route"
-                        v={gain !== null && gain >= 0.1 ? `${gain.toFixed(1)}% more than a plain buy` : quote.isError ? "Only this route fills this size" : "Best price"}
-                      />
-                    )}
                     {side === "buy" && <Row k="Pays if it wins" v={`${fmtAmount(out)} USDG`} />}
                     <Row k="Fee (included)" v={`${fee}%`} />
                     <Row k="Slippage limit" v="1%" />

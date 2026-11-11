@@ -2,7 +2,7 @@
 // Runs a sequence of wallet transactions (approvals, then the action) and shows each step in TxStepsModal.
 // Approval steps check the chain first and skip themselves when the allowance is already there.
 import { useState } from "react";
-import { usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { BaseError, ContractFunctionRevertedError, erc20Abi, maxUint256, type Address, type PublicClient, type TransactionReceipt } from "viem";
 import TxStepsModal, { type TxFlow, type TxStep } from "@/components/TxStepsModal";
 import { TARGET_CHAIN_ID } from "@/lib/config";
@@ -61,9 +61,25 @@ export function txError(e: unknown): string {
   return raw.length > 220 ? `${raw.slice(0, 220)}…` : raw;
 }
 
+function isAlreadyKnown(e: unknown) {
+  const err = e as { shortMessage?: string; message?: string; details?: string } | null;
+  return /already known|already imported|known transaction/i.test(`${err?.message ?? ""} ${err?.shortMessage ?? ""} ${err?.details ?? ""}`);
+}
+
+/** True once the account's mined transaction count passes `before` (checked for up to a minute). */
+async function nonceRises(client: NonNullable<ReturnType<typeof usePublicClient>>, address: Address, before: number) {
+  for (let k = 0; k < 30; k++) {
+    const n = await client.getTransactionCount({ address, blockTag: "latest" }).catch(() => before);
+    if (n > before) return true;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
+}
+
 export function useTxFlow(onSettled?: () => void) {
   const [flow, setFlow] = useState<TxFlow | null>(null);
   const client = usePublicClient({ chainId: TARGET_CHAIN_ID });
+  const { address } = useAccount();
 
   const start = async (title: string, steps: FlowStep[]): Promise<boolean> => {
     let state: TxStep[] = steps.map((s) => ({ id: s.id, label: s.label, state: "waiting" }));
@@ -81,7 +97,20 @@ export function useTxFlow(onSettled?: () => void) {
           continue;
         }
         patch(i, { state: "wallet" });
-        const hash = await steps[i].run();
+        // The account's transaction count before sending: if the wallet sends the same transaction twice, the node
+        // answers the copy with "already known" and the wallet reports that as a failure although the first one was
+        // sent. Then this count going up shows it went through.
+        const nonceBefore = address && client ? await client.getTransactionCount({ address, blockTag: "latest" }).catch(() => null) : null;
+        let hash: `0x${string}`;
+        try {
+          hash = await steps[i].run();
+        } catch (e) {
+          if (nonceBefore === null || !isAlreadyKnown(e)) throw e;
+          patch(i, { state: "pending", detail: "Your wallet sent this twice. Waiting for the first one…" });
+          if (!(await nonceRises(client!, address!, nonceBefore))) throw e;
+          patch(i, { state: "done", detail: "Went through (your wallet sent it twice and reported the copy's error)" });
+          continue;
+        }
         patch(i, { state: "pending", hash });
         const receipt = await client!.waitForTransactionReceipt({ hash });
         if (receipt.status !== "success") throw new Error("The transaction reverted onchain.");
