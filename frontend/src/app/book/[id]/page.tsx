@@ -65,6 +65,11 @@ export default function BookMarketPage() {
   const fee = (market.creatorFeeBps + market.protocolFeeBps) / 100;
   const hook = market.outcomes[0].key.hooks;
   const card = bookMarketCard(market, oracle ?? null, creatorUser);
+  // On a phone the trade panel sits below the market, so picking an outcome (or a price in the book) brings it into
+  // view.
+  const toTrade = () => {
+    if (window.innerWidth < 1024) setTimeout(() => document.getElementById("trade-panel")?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
 
   return (
     <Shell>
@@ -94,7 +99,7 @@ export default function BookMarketPage() {
             showAll
             showStats={false}
             selectedOutcomeLabel={outcome.name}
-            onSelectOutcome={(o: { label: string }) => setOutcomeIndex(Math.max(0, market.outcomes.findIndex((x) => x.name === o.label)))}
+            onSelectOutcome={(o: { label: string }) => { setOutcomeIndex(Math.max(0, market.outcomes.findIndex((x) => x.name === o.label))); toTrade(); }}
           />
           <dl className="flex flex-wrap gap-x-6 gap-y-1.5 font-mono text-xs px-1">
             <Meta k={phase === "trading" ? "Trading ends" : "Trading ended"} v={utc(market.endOfTrading)} />
@@ -119,7 +124,7 @@ export default function BookMarketPage() {
 
           <BookActivity market={market} />
 
-          <OrderBookView outcome={outcome} onPick={setPick} outcomes={market.outcomes} onOutcome={setOutcomeIndex} />
+          <OrderBookView outcome={outcome} onPick={(p) => { setPick(p); if (p) toTrade(); }} outcomes={market.outcomes} onOutcome={setOutcomeIndex} />
           <MyOrders market={market} onDone={refresh} />
 
           <Panel title="Contracts" collapsible dot="#a855f7" right={<span className="font-mono text-[10px] text-neutral-500">Fee {market.creatorFeeBps / 100}% creator · {market.protocolFeeBps / 100}% PFWA</span>}>
@@ -137,7 +142,9 @@ export default function BookMarketPage() {
         <aside className="space-y-6 min-w-0 lg:sticky lg:top-4">
           {OB.locker && <LockedLiquidityPanel market={market} user={user} onDone={refresh} highlight={justCreated} />}
           {!OB.locker && justCreated && <LiquidityPanel market={market} user={user} onDone={refresh} highlight />}
-          <TradePanel market={market} outcomeIndex={outcomeIndex} onOutcome={setOutcomeIndex} user={user} pick={pick} onDone={refresh} />
+          <div id="trade-panel" className="scroll-mt-4">
+            <TradePanel market={market} outcomeIndex={outcomeIndex} onOutcome={setOutcomeIndex} user={user} pick={pick} onDone={refresh} />
+          </div>
           <SetsPanel market={market} user={user} onDone={refresh} />
           {OB.forwarder && <PayAnyChain market={market} outcomeIndex={outcomeIndex} onDone={refresh} />}
           <ResolutionPanel market={market} user={user} onDone={refresh} />
