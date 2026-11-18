@@ -133,6 +133,10 @@ If nobody holds the winning option, the pool is sent to the platform treasury si
 
 Winners call `claimWinnings()` on the winning option token. It burns the caller's full balance and pays `balance × fixedRedemptionPrice`. Because the price is fixed at resolution, every winner is paid the same rate regardless of when they claim.
 
+### 5. Paying from any chain (NEAR Intents)
+
+`CurveIntentForwarder` lets someone buy an option with a coin on another chain. NEAR Intents' 1Click API delivers ETH on Robinhood Chain to a one-time deposit address, which is CREATE2 of the order (user, market, option, minimum shares, deadline, nonce). Then anyone, normally the app's keeper, calls `execute(order)`: the forwarder buys the shares with that ETH, after the market's fees, and sends them to the user with any ETH the curve didn't use. It reverts if the user would get fewer than the order's minimum. `refund(order)` returns the ETH to the user on Robinhood Chain: the user can call it at any time, anyone can after the deadline. The forwarder takes no fee. It emits `Executed(deposit, buyer, marketId, option, token, ethIn, shares)` so indexers can credit the buy to the user, since the token's own event names the forwarder.
+
 ### Automated markets: the orchestrator
 
 `PFWA.sol` is a relayer-controlled orchestrator that sits in front of the factory and runs recurring markets from off-chain data (Dune Analytics):
@@ -148,6 +152,7 @@ Winners call `claimWinnings()` on the winning option token. It burns the caller'
 | `PFWAMarketFactory` (V1, legacy markets) | [`0x2502aB7E69dDb3157683A82E603360Ada9B6E647`](https://robinhoodchain.blockscout.com/address/0x2502aB7E69dDb3157683A82E603360Ada9B6E647) | 92 |
 | `PFWA` orchestrator | [`0x943F5d2E75afec6d3f75aaF2E7Cdf8fE5418eD33`](https://robinhoodchain.blockscout.com/address/0x943F5d2E75afec6d3f75aaF2E7Cdf8fE5418eD33) | — |
 | `BondingCurveToken` implementation (V2) | [`0x913d53E2fc37F3B4a2B67eE7c089B827054455b8`](https://robinhoodchain.blockscout.com/address/0x913d53E2fc37F3B4a2B67eE7c089B827054455b8) | — |
+| `CurveIntentForwarder` (pay from any chain, for the V2 factory) | [`0xcEb2344590d62F630d9f827A388210D0D3a16020`](https://robinhoodchain.blockscout.com/address/0xcEb2344590d62F630d9f827A388210D0D3a16020), [Sourcify](https://sourcify.dev/server/v2/contract/4663/0xcEb2344590d62F630d9f827A388210D0D3a16020) | — |
 | `BondingCurveToken` option tokens | one EIP-1167 clone per market option — read via `getOptionTokenAddresses(marketId)` | — |
 
 Market counts are as of September 11, 2026 and can be checked by calling `marketCount()` on each factory.
@@ -176,6 +181,7 @@ PFWA was built over about six weeks inside the private pfwa.fun monorepo (fronte
 |---|---|
 | [`src/PFWAMarketFactory.sol`](src/PFWAMarketFactory.sol) | Singleton factory: market creation, resolution, fee routing, PFWA buyback & burn, admin controls |
 | [`src/BondingCurveToken.sol`](src/BondingCurveToken.sol) | Per-option ERC-20 with linear bonding curve, buy/sell, fixed-price redemption |
+| [`src/CurveIntentForwarder.sol`](src/CurveIntentForwarder.sol) | Pay from any chain: buys an option's shares with ETH delivered by NEAR Intents to the order's deposit address, or refunds it. Tests in [`test/`](test) (unit, and a fork test against the live factory) |
 | [`src/PFWA.sol`](src/PFWA.sol) | Relayer orchestrator for daily checkpoint and listing markets |
 | [`src/interfaces/IPFWAMarketFactory.sol`](src/interfaces/IPFWAMarketFactory.sol) | Minimal factory interface |
 | [`src/PFWAMarkets.sol`](src/PFWAMarkets.sol) | Documentation only: catalogue of supported market designs and their data sources |
